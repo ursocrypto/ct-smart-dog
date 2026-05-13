@@ -1,0 +1,1539 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CT Smart Dog — Sistema de Gestão</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --orange:#F08C4A;--orange-light:#fde8d5;--orange-dark:#c86a28;
+  --gold:#E3A53B;--gold-light:#faf0d7;--gold-mid:#f0c878;
+  --brown:#3E2D24;--brown-light:#f5ede8;--brown-mid:#7a5c4a;
+  --sage:#85A197;--sage-light:#e8f0ee;--sage-mid:#b5cec8;
+  --green:#2d7a4f;--green-light:#e8f5ee;
+  --red:#c0392b;--red-light:#fdeaea;
+  --blue:#2a4a7a;--blue-light:#e8eef5;
+  --purple:#6b4fa0;--purple-light:#f0ebff;
+  --bg:#f7f3ee;--white:#fff;
+  --border:#ede5dc;--border-mid:#ded5cc;
+}
+html,body{height:100%;font-family:'Bricolage Grotesque',system-ui;background:var(--bg);color:var(--brown);font-size:14px}
+
+/* ====== LOGIN ====== */
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--brown)}
+.login-box{background:#fff;border-radius:16px;padding:40px;width:380px;max-width:95vw}
+.login-logo{text-align:center;margin-bottom:28px}
+.login-logo-icon{width:64px;height:64px;background:var(--orange-light);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 12px}
+.login-logo h1{font-size:22px;font-weight:700;color:var(--brown)}
+.login-logo p{font-size:12px;color:var(--brown-mid);margin-top:4px}
+.login-field{margin-bottom:14px}
+.login-field label{font-size:11px;font-weight:600;color:var(--brown-mid);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em}
+.login-field input{width:100%;padding:10px 12px;border:1.5px solid var(--border-mid);border-radius:10px;font-size:13px;font-family:inherit;color:var(--brown);transition:border .15s}
+.login-field input:focus{outline:none;border-color:var(--orange)}
+.login-btn{width:100%;padding:12px;background:var(--orange);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:6px;transition:background .15s}
+.login-btn:hover{background:var(--orange-dark)}
+.login-error{background:var(--red-light);color:var(--red);padding:9px 12px;border-radius:8px;font-size:12px;margin-bottom:12px;display:none}
+
+/* ====== APP ====== */
+#app{display:none;height:100vh;overflow:hidden;flex-direction:column}
+#app.visible{display:flex}
+
+/* TOP BAR */
+.topbar{background:var(--orange);height:52px;display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0;z-index:100}
+.topbar-logo{display:flex;align-items:center;gap:8px;color:#fff}
+.topbar-logo-icon{width:30px;height:30px;background:rgba(255,255,255,.2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.topbar-logo-name{font-size:14px;font-weight:700}
+.topbar-logo-sub{font-size:10px;opacity:.65}
+.topbar-spacer{flex:1}
+.topbar-user{display:flex;align-items:center;gap:8px;color:rgba(255,255,255,.85);font-size:12px}
+.topbar-avatar{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff}
+.topbar-btn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;padding:5px 10px;border-radius:7px;font-size:11px;cursor:pointer;font-family:inherit;transition:all .12s}
+.topbar-btn:hover{background:rgba(255,255,255,.25)}
+
+/* LAYOUT */
+.layout{display:flex;flex:1;overflow:hidden}
+
+/* SIDEBAR */
+.sidebar{width:210px;min-width:210px;background:var(--brown);display:flex;flex-direction:column;overflow-y:auto;transition:width .2s}
+.sidebar.collapsed{width:52px;min-width:52px}
+.sb-section{font-size:9px;font-weight:700;color:rgba(255,255,255,.3);padding:12px 14px 4px;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;overflow:hidden}
+.sidebar.collapsed .sb-section{opacity:0}
+.sb-item{display:flex;align-items:center;gap:9px;padding:9px 14px;font-size:12px;color:rgba(255,255,255,.6);cursor:pointer;border-left:2.5px solid transparent;transition:all .12s;white-space:nowrap;overflow:hidden}
+.sb-item i{font-size:17px;flex-shrink:0}
+.sb-item:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.9)}
+.sb-item.on{background:rgba(240,140,74,.2);color:var(--orange);border-left-color:var(--orange);font-weight:600}
+.sb-foot{margin-top:auto;padding:10px 14px;border-top:1px solid rgba(255,255,255,.1);font-size:10px;color:rgba(255,255,255,.3);white-space:nowrap;overflow:hidden}
+
+/* MAIN */
+.main{flex:1;overflow-y:auto;background:var(--bg)}
+.page{display:none;padding:20px;animation:fadeIn .2s ease}
+.page.on{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.page-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px}
+.page-title{font-size:18px;font-weight:700;color:var(--brown)}
+
+/* CARDS */
+.card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px}
+.card-title{font-size:13px;font-weight:600;color:var(--brown);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+
+/* METRICS */
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px}
+.met{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px}
+.met-lbl{font-size:10px;color:var(--brown-mid);margin-bottom:5px;font-weight:500}
+.met-val{font-size:20px;font-weight:700}
+.met-sub{font-size:10px;color:var(--brown-mid);margin-top:3px}
+.c-orange{color:var(--orange)}.c-gold{color:var(--gold)}.c-sage{color:var(--sage)}
+.c-green{color:var(--green)}.c-red{color:var(--red)}.c-blue{color:var(--blue)}.c-purple{color:var(--purple)}.c-brown{color:var(--brown)}
+
+/* TABLE */
+.tbl-wrap{overflow-x:auto}
+.tbl{width:100%;border-collapse:collapse;font-size:12px;min-width:500px}
+.tbl th{text-align:left;padding:7px 10px;color:var(--brown-mid);font-weight:600;border-bottom:1px solid var(--border);font-size:11px;white-space:nowrap;background:#fdf8f4}
+.tbl td{padding:9px 10px;border-bottom:1px solid #f5ede8;vertical-align:middle}
+.tbl tr:last-child td{border:none}
+.tbl tr:hover td{background:#fdf8f4;cursor:pointer}
+.tbl-empty{text-align:center;padding:30px;color:var(--brown-mid);font-size:13px}
+
+/* BADGES */
+.bdg{display:inline-flex;align-items:center;padding:2px 9px;border-radius:100px;font-size:10px;font-weight:600;white-space:nowrap}
+.bdg-orange{background:var(--orange-light);color:var(--orange-dark)}
+.bdg-gold{background:var(--gold-light);color:#8a6018}
+.bdg-sage{background:var(--sage-light);color:#3a6558}
+.bdg-green{background:var(--green-light);color:var(--green)}
+.bdg-red{background:var(--red-light);color:var(--red)}
+.bdg-blue{background:var(--blue-light);color:var(--blue)}
+.bdg-purple{background:var(--purple-light);color:var(--purple)}
+.bdg-brown{background:var(--brown-light);color:var(--brown)}
+.bdg-gray{background:#f0f0f0;color:#666}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:12px;cursor:pointer;border:1px solid var(--border-mid);background:#fff;color:var(--brown);transition:all .12s;font-family:inherit;font-weight:500}
+.btn:hover{background:var(--brown-light)}
+.btn-primary{background:var(--orange);color:#fff;border-color:var(--orange)}
+.btn-primary:hover{background:var(--orange-dark)}
+.btn-green{background:var(--green-light);color:var(--green);border-color:#b5d9c5}
+.btn-red{background:var(--red-light);color:var(--red);border-color:#f5b5b5}
+.btn-sm{padding:5px 10px;font-size:11px}
+.btn-xs{padding:3px 8px;font-size:10px}
+
+/* FORMS */
+.field{margin-bottom:10px}
+.field label{font-size:11px;color:var(--brown-mid);display:block;margin-bottom:4px;font-weight:600}
+.field input,.field select,.field textarea{width:100%;padding:8px 10px;border:1.5px solid var(--border-mid);border-radius:8px;background:#fff;color:var(--brown);font-size:12px;font-family:inherit;transition:border .15s}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--orange)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+
+/* MODAL */
+.overlay{display:none;position:fixed;inset:0;background:rgba(62,45,36,.5);z-index:1000;align-items:center;justify-content:center;padding:16px}
+.overlay.on{display:flex}
+.modal{background:#fff;border-radius:16px;padding:24px;width:520px;max-width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.modal-title{font-size:16px;font-weight:700;color:var(--brown);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.modal-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border)}
+
+/* ALERTS */
+.alert{display:flex;align-items:flex-start;gap:8px;padding:10px 13px;border-radius:8px;font-size:12px;margin-bottom:8px;line-height:1.5}
+.alert-orange{background:var(--orange-light);color:var(--orange-dark)}
+.alert-red{background:var(--red-light);color:var(--red)}
+.alert-green{background:var(--green-light);color:var(--green)}
+.alert-gold{background:var(--gold-light);color:#8a6018}
+.alert-sage{background:var(--sage-light);color:#3a6558}
+
+/* BARS */
+.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.bar-lbl{font-size:11px;color:var(--brown-mid);min-width:100px}
+.bar-track{flex:1;height:7px;background:#f0e8e0;border-radius:100px;overflow:hidden}
+.bar-fill{height:100%;border-radius:100px}
+.bar-val{font-size:11px;font-weight:600;min-width:65px;text-align:right}
+
+/* META BAR */
+.meta-bar-track{height:16px;background:#f0e8e0;border-radius:100px;overflow:hidden;margin:8px 0 5px}
+.meta-bar-fill{height:100%;border-radius:100px;background:linear-gradient(90deg,var(--gold),var(--orange));transition:width .6s ease}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--brown);color:#fff;padding:12px 18px;border-radius:12px;font-size:13px;font-weight:500;z-index:9999;transform:translateY(80px);opacity:0;transition:all .3s;max-width:300px}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{background:var(--green)}
+.toast.error{background:var(--red)}
+
+/* LOADING */
+.loading{display:flex;align-items:center;justify-content:center;padding:40px;color:var(--brown-mid);gap:10px;font-size:13px}
+.spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--orange);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* GRID */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+
+/* TUTOR ROW */
+.tutor-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f5ede8}
+.tutor-row:last-child{border:none}
+.av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;background:var(--orange-light);color:var(--orange-dark)}
+
+/* MOBILE */
+@media(max-width:768px){
+  .sidebar{position:fixed;left:-210px;top:52px;bottom:0;z-index:200;transition:left .25s}
+  .sidebar.mobile-open{left:0}
+  .main{width:100%}
+  .g2,.g3{grid-template-columns:1fr}
+  .row2,.row3{grid-template-columns:1fr}
+  .page{padding:14px}
+}
+
+/* SUM ROWS */
+.sum-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #f5ede8;font-size:12px}
+.sum-row:last-child{border:none;font-weight:700;font-size:13px;padding-top:10px}
+
+/* DIVIDER */
+.divider{height:1px;background:var(--border);margin:12px 0}
+
+/* FUNIL */
+.funil{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px}
+.funil-col{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.funil-head{padding:8px 10px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:space-between}
+.funil-body{padding:6px;min-height:120px}
+.lead-card{background:#fff;border:1px solid var(--border);border-radius:7px;padding:8px;margin-bottom:5px;cursor:pointer;font-size:11px}
+.lead-card:hover{border-color:var(--orange)}
+.lead-name{font-weight:600;color:var(--brown);margin-bottom:2px}
+.lead-sub{color:var(--brown-mid);font-size:10px;margin-bottom:4px}
+@media(max-width:900px){.funil{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="login-logo-icon">🐾</div>
+      <h1>CT Smart Dog</h1>
+      <p>Centro de Treinamento · Sistema de Gestão</p>
+    </div>
+    <div id="login-error" class="login-error"></div>
+    <div class="login-field">
+      <label>E-mail</label>
+      <input type="email" id="login-email" placeholder="seu@email.com" />
+    </div>
+    <div class="login-field">
+      <label>Senha</label>
+      <input type="password" id="login-senha" placeholder="••••••••" onkeydown="if(event.key==='Enter')fazerLogin()" />
+    </div>
+    <button class="login-btn" onclick="fazerLogin()">Entrar</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <button class="topbar-btn" onclick="toggleSidebar()" style="padding:5px 8px"><i class="ti ti-menu-2" style="font-size:18px"></i></button>
+    <div class="topbar-logo">
+      <div class="topbar-logo-icon">🐾</div>
+      <div>
+        <div class="topbar-logo-name">CT Smart Dog</div>
+        <div class="topbar-logo-sub">Centro de Treinamento</div>
+      </div>
+    </div>
+    <div class="topbar-spacer"></div>
+    <div class="topbar-user">
+      <div class="topbar-avatar" id="user-avatar">--</div>
+      <span id="user-name" style="display:none"></span>
+    </div>
+    <button class="topbar-btn" onclick="fazerLogout()"><i class="ti ti-logout" style="font-size:15px"></i></button>
+  </div>
+
+  <div class="layout">
+    <!-- SIDEBAR -->
+    <nav class="sidebar" id="sidebar">
+      <span class="sb-section">Principal</span>
+      <div class="sb-item on" onclick="nav('dashboard',this)"><i class="ti ti-layout-dashboard"></i><span>Painel Geral</span></div>
+      <div class="sb-item" onclick="nav('agenda',this)"><i class="ti ti-calendar"></i><span>Agenda</span></div>
+      <div class="sb-item" onclick="nav('vagas',this)"><i class="ti ti-grid-dots"></i><span>Mapa de Vagas</span></div>
+      <div class="sb-item" onclick="nav('reservas',this)"><i class="ti ti-clipboard-list"></i><span>Reservas</span></div>
+      <span class="sb-section">Cadastros</span>
+      <div class="sb-item" onclick="nav('pets',this)"><i class="ti ti-paw"></i><span>Pets & Tutores</span></div>
+      <div class="sb-item" onclick="nav('servicos',this)"><i class="ti ti-star"></i><span>Serviços</span></div>
+      <div class="sb-item" onclick="nav('loja',this)"><i class="ti ti-shopping-bag"></i><span>Loja</span></div>
+      <span class="sb-section">Relacionamento</span>
+      <div class="sb-item" onclick="nav('crm',this)"><i class="ti ti-users"></i><span>CRM / Leads</span></div>
+      <div class="sb-item" onclick="nav('parcerias',this)"><i class="ti ti-handshake"></i><span>Parcerias</span></div>
+      <span class="sb-section">Financeiro</span>
+      <div class="sb-item" onclick="nav('financeiro',this)"><i class="ti ti-chart-bar"></i><span>Financeiro</span></div>
+      <div class="sb-item" onclick="nav('caixa',this)"><i class="ti ti-cash"></i><span>Caixa do Dia</span></div>
+      <div class="sb-item" onclick="nav('relatorios',this)"><i class="ti ti-report"></i><span>Relatórios</span></div>
+      <span class="sb-section">Sistema</span>
+      <div class="sb-item" onclick="nav('config',this)"><i class="ti ti-settings"></i><span>Configurações</span></div>
+      <div class="sb-foot">CT Smart Dog v1.0</div>
+    </nav>
+
+    <!-- MAIN -->
+    <div class="main" id="main">
+
+      <!-- DASHBOARD -->
+      <div class="page on" id="page-dashboard">
+        <div class="page-head">
+          <div class="page-title">🐾 Painel Geral</div>
+          <button class="btn btn-primary btn-sm" onclick="abrirModal('modal-reserva')"><i class="ti ti-plus"></i>Nova reserva</button>
+        </div>
+        <div id="dashboard-metrics" class="metrics">
+          <div class="met"><div class="met-lbl">Carregando...</div><div class="met-val">--</div></div>
+        </div>
+        <div id="dashboard-meta"></div>
+        <div class="g2">
+          <div class="card">
+            <div class="card-title">Alertas do dia</div>
+            <div id="dashboard-alertas"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Pets no estabelecimento</div>
+            <div id="dashboard-pets"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RESERVAS -->
+      <div class="page" id="page-reservas">
+        <div class="page-head">
+          <div class="page-title">📋 Reservas</div>
+          <button class="btn btn-primary btn-sm" onclick="abrirModal('modal-reserva')"><i class="ti ti-plus"></i>Nova reserva</button>
+        </div>
+        <div class="card" style="padding:12px 16px">
+          <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+            <input id="filtro-reserva" placeholder="Buscar pet ou tutor..." style="max-width:220px;padding:7px 10px;border:1.5px solid var(--border-mid);border-radius:8px;font-size:12px;font-family:inherit" oninput="filtrarReservas()"/>
+            <select id="filtro-reserva-status" onchange="filtrarReservas()" style="padding:7px 10px;border:1.5px solid var(--border-mid);border-radius:8px;font-size:12px;font-family:inherit">
+              <option value="">Todos os status</option>
+              <option value="confirmada">Confirmada</option>
+              <option value="em_andamento">Em andamento</option>
+              <option value="concluida">Concluída</option>
+            </select>
+          </div>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th>#</th><th>Pet</th><th>Tutor</th><th>Serviço</th><th>Entrada</th><th>Saída</th><th>Valor</th><th>Pgto</th><th>Status</th><th></th></tr></thead>
+              <tbody id="tbl-reservas"><tr><td colspan="10" class="tbl-empty"><div class="loading"><div class="spinner"></div>Carregando...</div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- AGENDA -->
+      <div class="page" id="page-agenda">
+        <div class="page-head">
+          <div class="page-title">📅 Agenda</div>
+          <button class="btn btn-primary btn-sm" onclick="abrirModal('modal-reserva')"><i class="ti ti-plus"></i>Nova reserva</button>
+        </div>
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <button class="btn btn-sm" onclick="mudarMes(-1)"><i class="ti ti-chevron-left"></i></button>
+            <span id="agenda-titulo" style="font-weight:600;font-size:14px"></span>
+            <button class="btn btn-sm" onclick="mudarMes(1)"><i class="ti ti-chevron-right"></i></button>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:3px">
+            <div style="text-align:center;font-size:10px;font-weight:700;color:var(--brown-mid);padding:4px">Dom</div>
+            <div style="text-align:center;font-size:10px;font-weight:700;color:var(--brown-mid);padding:4px">Seg</div>
+            <div style="text-align:center;font-size:10px;font-weight:700;color:var(--brown-mid);padding:4px">Ter</div>
+            <div style="text-align:center;font-size:10px;font-weight:700;color:var(--brown-mid);padding:4px">Qua</div>
+            <div style="text-align:center;font-size:10px;font-weight:700;color:var(--brown-mid);padding:4px">Qui</div>
+            <div style="text-align:center;font-size:10px;font-weight:700;color:var(--brown-mid);padding:4px">Sex</div>
+            <div style="text-align:center;font-size:10px;font-weight:700;color:var(--brown-mid);padding:4px">Sáb</div>
+          </div>
+          <div id="agenda-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px"></div>
+        </div>
+      </div>
+
+      <!-- MAPA DE VAGAS -->
+      <div class="page" id="page-vagas">
+        <div class="page-head"><div class="page-title">🗺️ Mapa de Vagas</div></div>
+        <div class="g2">
+          <div class="card">
+            <div class="card-title">Hospedagem + Internato</div>
+            <div id="vagas-hosp" style="display:grid;grid-template-columns:repeat(8,1fr);gap:5px"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Creche + Day Use</div>
+            <div id="vagas-creche" style="display:grid;grid-template-columns:repeat(8,1fr);gap:5px;margin-bottom:10px"></div>
+            <div style="font-size:11px;font-weight:600;color:var(--brown-mid);margin-bottom:5px">Day Use</div>
+            <div id="vagas-dayuse" style="display:grid;grid-template-columns:repeat(6,1fr);gap:5px"></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;font-size:11px;color:var(--brown-mid);flex-wrap:wrap">
+          <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:12px;border-radius:3px;background:var(--gold-light);border:1px solid var(--gold-mid);display:inline-block"></span>Ocupada</span>
+          <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:12px;border-radius:3px;background:var(--green-light);border:1px solid #b5d9c5;display:inline-block"></span>Livre</span>
+          <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:12px;border-radius:3px;background:var(--brown-light);border:1px solid #c5a898;display:inline-block"></span>Internato</span>
+        </div>
+      </div>
+
+      <!-- PETS & TUTORES -->
+      <div class="page" id="page-pets">
+        <div class="page-head">
+          <div class="page-title">🐶 Pets & Tutores</div>
+          <button class="btn btn-primary btn-sm" onclick="abrirModal('modal-tutor')"><i class="ti ti-plus"></i>Novo cadastro</button>
+        </div>
+        <div class="card">
+          <input id="filtro-tutor" placeholder="Buscar por nome do tutor ou pet..." style="width:100%;max-width:300px;padding:8px 10px;border:1.5px solid var(--border-mid);border-radius:8px;font-size:12px;font-family:inherit;margin-bottom:12px" oninput="filtrarTutores()"/>
+          <div id="lista-tutores"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
+        </div>
+      </div>
+
+      <!-- SERVIÇOS -->
+      <div class="page" id="page-servicos">
+        <div class="page-head">
+          <div class="page-title">⭐ Serviços & Preços</div>
+          <button class="btn btn-primary btn-sm" onclick="abrirModal('modal-servico')"><i class="ti ti-plus"></i>Novo serviço</button>
+        </div>
+        <div id="lista-servicos"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
+      </div>
+
+      <!-- LOJA -->
+      <div class="page" id="page-loja">
+        <div class="page-head">
+          <div class="page-title">🛍️ Loja / Acessórios</div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm" onclick="abrirModal('modal-venda')"><i class="ti ti-shopping-cart"></i>Registrar venda</button>
+            <button class="btn btn-primary btn-sm" onclick="abrirModal('modal-produto')"><i class="ti ti-plus"></i>Novo produto</button>
+          </div>
+        </div>
+        <div id="lista-produtos"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
+      </div>
+
+      <!-- CRM -->
+      <div class="page" id="page-crm">
+        <div class="page-head">
+          <div class="page-title">👥 CRM / Leads</div>
+          <button class="btn btn-primary btn-sm" onclick="abrirModal('modal-lead')"><i class="ti ti-plus"></i>Novo lead</button>
+        </div>
+        <div class="card" style="margin-bottom:10px">
+          <div style="font-size:12px;font-weight:600;color:var(--brown);margin-bottom:10px">Funil de contatos</div>
+          <div class="funil" id="funil-leads"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Follow-ups pendentes</div>
+          <div id="lista-followups"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
+        </div>
+      </div>
+
+      <!-- PARCERIAS -->
+      <div class="page" id="page-parcerias">
+        <div class="page-head">
+          <div class="page-title">🤝 Parcerias</div>
+          <button class="btn btn-primary btn-sm" onclick="abrirModal('modal-parceiro')"><i class="ti ti-plus"></i>Novo parceiro</button>
+        </div>
+        <div id="lista-parceiros"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
+      </div>
+
+      <!-- FINANCEIRO -->
+      <div class="page" id="page-financeiro">
+        <div class="page-head">
+          <div class="page-title">📊 Financeiro</div>
+          <button class="btn btn-sm" onclick="abrirModal('modal-meta')"><i class="ti ti-target"></i>Ajustar meta</button>
+        </div>
+        <div id="financeiro-meta"></div>
+        <div id="financeiro-metrics" class="metrics"></div>
+        <div class="g2">
+          <div class="card">
+            <div class="card-title">Receitas por serviço</div>
+            <div id="financeiro-receitas"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Origem dos clientes</div>
+            <div id="financeiro-origens"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">DRE — Demonstrativo de Resultados</div>
+          <div id="financeiro-dre"></div>
+        </div>
+      </div>
+
+      <!-- CAIXA -->
+      <div class="page" id="page-caixa">
+        <div class="page-head">
+          <div class="page-title">💰 Caixa do Dia</div>
+          <button class="btn btn-primary btn-sm" onclick="abrirModal('modal-movimentacao')"><i class="ti ti-plus"></i>Nova movimentação</button>
+        </div>
+        <div id="caixa-metrics" class="metrics"></div>
+        <div class="card">
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th>Hora</th><th>Descrição</th><th>Categoria</th><th>Forma</th><th>Tipo</th><th>Valor</th></tr></thead>
+              <tbody id="tbl-caixa"><tr><td colspan="6" class="tbl-empty"><div class="loading"><div class="spinner"></div>Carregando...</div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- RELATÓRIOS -->
+      <div class="page" id="page-relatorios">
+        <div class="page-head"><div class="page-title">📈 Relatórios</div></div>
+        <div id="relatorios-content"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
+      </div>
+
+      <!-- CONFIG -->
+      <div class="page" id="page-config">
+        <div class="page-head"><div class="page-title">⚙️ Configurações</div></div>
+        <div class="g2">
+          <div class="card">
+            <div class="card-title">Dados da empresa</div>
+            <div class="field"><label>Nome</label><input value="CT Smart Dog"/></div>
+            <div class="field"><label>Telefone</label><input id="cfg-tel" placeholder="(21) 99000-0000"/></div>
+            <div class="field"><label>Endereço</label><input id="cfg-end" placeholder="Rio de Janeiro, RJ"/></div>
+            <div class="field"><label>E-mail</label><input id="cfg-email" placeholder="contato@ctsmartdog.com.br"/></div>
+            <button class="btn btn-primary btn-sm" onclick="showToast('Dados salvos!','success')">Salvar</button>
+          </div>
+          <div class="card">
+            <div class="card-title">Vagas totais</div>
+            <div class="row2">
+              <div class="field"><label>Hospedagem</label><input type="number" id="cfg-v-hosp" value="24"/></div>
+              <div class="field"><label>Internato</label><input type="number" id="cfg-v-intern" value="5"/></div>
+              <div class="field"><label>Creche</label><input type="number" id="cfg-v-creche" value="15"/></div>
+              <div class="field"><label>Day Use</label><input type="number" id="cfg-v-dayuse" value="6"/></div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="showToast('Vagas atualizadas!','success')">Salvar</button>
+          </div>
+          <div class="card">
+            <div class="card-title">Convidar usuário</div>
+            <div class="field"><label>E-mail</label><input id="cfg-invite-email" placeholder="funcionario@email.com"/></div>
+            <div class="field"><label>Perfil</label>
+              <select id="cfg-invite-perfil">
+                <option value="operador">Operador</option>
+                <option value="caixa">Caixa</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="convidarUsuario()"><i class="ti ti-mail"></i>Enviar convite</button>
+          </div>
+          <div class="card">
+            <div class="card-title">Notificações</div>
+            <div style="display:flex;flex-direction:column;gap:10px;font-size:12px">
+              <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" checked style="accent-color:var(--orange)"/>Alerta de vacina vencendo</label>
+              <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" checked style="accent-color:var(--orange)"/>Lembrete de check-out</label>
+              <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" checked style="accent-color:var(--orange)"/>Estoque baixo de produtos</label>
+              <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" style="accent-color:var(--orange)"/>Relatório semanal por e-mail</label>
+              <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" checked style="accent-color:var(--orange)"/>Follow-ups pendentes</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /main -->
+  </div><!-- /layout -->
+</div><!-- /app -->
+
+<!-- ====== MODAIS ====== -->
+
+<!-- MODAL RESERVA -->
+<div class="overlay" id="modal-reserva">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-clipboard-list" style="color:var(--orange)"></i>Nova Reserva</div>
+    <div class="row2">
+      <div class="field"><label>Tutor</label><select id="res-tutor" onchange="carregarPetsDoTutor()"><option value="">Selecionar tutor...</option></select></div>
+      <div class="field"><label>Pet</label><select id="res-pet"><option value="">Selecionar pet...</option></select></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Serviço</label>
+        <select id="res-servico">
+          <option value="hospedagem">Hospedagem</option>
+          <option value="internato">Internato</option>
+          <option value="creche">Creche Diária</option>
+          <option value="day_use">Day Use</option>
+          <option value="banho_tosa">Banho & Tosa</option>
+          <option value="adestramento">Adestramento</option>
+          <option value="passeio">Passeio</option>
+        </select>
+      </div>
+      <div class="field"><label>Valor total (R$)</label><input type="number" id="res-valor" placeholder="0.00"/></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Data de entrada</label><input type="date" id="res-entrada"/></div>
+      <div class="field"><label>Data de saída</label><input type="date" id="res-saida"/></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Forma de pagamento</label>
+        <select id="res-pgto">
+          <option value="pix">PIX</option>
+          <option value="dinheiro">Dinheiro</option>
+          <option value="credito">Cartão de Crédito</option>
+          <option value="debito">Cartão de Débito</option>
+        </select>
+      </div>
+      <div class="field"><label>Status pagamento</label>
+        <select id="res-status-pgto">
+          <option value="pendente">Pendente</option>
+          <option value="pago">Pago</option>
+          <option value="parcial">Parcial</option>
+        </select>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Origem do cliente</label>
+        <select id="res-origem">
+          <option value="organico">Orgânico / Indicação</option>
+          <option value="trafego_pago">Tráfego Pago</option>
+          <option value="blogueiro">Blogueiro</option>
+          <option value="adestrador">Adestrador Parceiro</option>
+        </select>
+      </div>
+      <div class="field"><label>Vaga nº</label><input type="number" id="res-vaga" placeholder="Ex: 5"/></div>
+    </div>
+    <div class="field"><label>Observações (medicação, alimentação especial...)</label><textarea id="res-obs" rows="2" placeholder="Ex: Tomar remédio às 12h..."></textarea></div>
+    <div class="modal-foot">
+      <button class="btn" onclick="fecharModal('modal-reserva')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarReserva()"><i class="ti ti-check"></i>Confirmar reserva</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL TUTOR -->
+<div class="overlay" id="modal-tutor">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-user" style="color:var(--orange)"></i>Novo Tutor & Pet</div>
+    <div style="font-size:12px;font-weight:600;color:var(--brown-mid);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Dados do tutor</div>
+    <div class="row2">
+      <div class="field"><label>Nome completo</label><input id="tut-nome" placeholder="Nome do tutor"/></div>
+      <div class="field"><label>Telefone / WhatsApp</label><input id="tut-tel" placeholder="(21) 99999-0000"/></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>E-mail</label><input id="tut-email" placeholder="email@exemplo.com"/></div>
+      <div class="field"><label>Como nos conheceu</label>
+        <select id="tut-origem">
+          <option value="organico">Indicação / Orgânico</option>
+          <option value="trafego_pago">Tráfego Pago</option>
+          <option value="blogueiro">Blogueiro</option>
+          <option value="adestrador">Adestrador Parceiro</option>
+        </select>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div style="font-size:12px;font-weight:600;color:var(--brown-mid);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Dados do pet</div>
+    <div class="row3">
+      <div class="field"><label>Nome do pet</label><input id="pet-nome" placeholder="Ex: Rex"/></div>
+      <div class="field"><label>Raça</label><input id="pet-raca" placeholder="Ex: Golden Retriever"/></div>
+      <div class="field"><label>Porte</label>
+        <select id="pet-porte">
+          <option value="pequeno">Pequeno (até 10kg)</option>
+          <option value="medio">Médio (10–25kg)</option>
+          <option value="grande">Grande (acima 25kg)</option>
+        </select>
+      </div>
+    </div>
+    <div class="row3">
+      <div class="field"><label>Sexo</label>
+        <select id="pet-sexo"><option value="macho">Macho</option><option value="femea">Fêmea</option></select>
+      </div>
+      <div class="field"><label>Idade (anos)</label><input type="number" id="pet-idade" placeholder="Ex: 3"/></div>
+      <div class="field"><label>Peso (kg)</label><input type="number" id="pet-peso" placeholder="Ex: 28.5" step="0.1"/></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Vacina V8/V10 — vencimento</label><input type="date" id="pet-v8"/></div>
+      <div class="field"><label>Antirrábica — vencimento</label><input type="date" id="pet-antirrab"/></div>
+    </div>
+    <div class="field"><label>Medicação contínua</label><input id="pet-med" placeholder="Ex: Antipulgas mensal"/></div>
+    <div class="field"><label>Observações</label><textarea id="pet-obs" rows="2" placeholder="Comportamento, alergias, não convive com..."></textarea></div>
+    <div class="modal-foot">
+      <button class="btn" onclick="fecharModal('modal-tutor')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarTutor()"><i class="ti ti-check"></i>Cadastrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL MOVIMENTAÇÃO -->
+<div class="overlay" id="modal-movimentacao">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-cash" style="color:var(--orange)"></i>Nova Movimentação de Caixa</div>
+    <div class="row2">
+      <div class="field"><label>Tipo</label>
+        <select id="mov-tipo">
+          <option value="entrada">Entrada</option>
+          <option value="saida">Saída</option>
+        </select>
+      </div>
+      <div class="field"><label>Categoria</label>
+        <select id="mov-cat">
+          <option value="hospedagem">Hospedagem</option>
+          <option value="internato">Internato</option>
+          <option value="creche">Creche</option>
+          <option value="day_use">Day Use</option>
+          <option value="banho_tosa">Banho & Tosa</option>
+          <option value="adestramento">Adestramento</option>
+          <option value="passeio">Passeio</option>
+          <option value="acessorio">Acessório</option>
+          <option value="funcionarios">Funcionários</option>
+          <option value="insumos">Insumos / Ração</option>
+          <option value="aluguel">Aluguel</option>
+          <option value="trafego_pago">Tráfego Pago</option>
+          <option value="repasse_parceiro">Repasse Parceiro</option>
+          <option value="repasse_banhista">Repasse Banhista</option>
+          <option value="manutencao">Manutenção</option>
+          <option value="outros">Outros</option>
+        </select>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Valor (R$)</label><input type="number" id="mov-valor" placeholder="0.00" step="0.01"/></div>
+      <div class="field"><label>Forma de pagamento</label>
+        <select id="mov-pgto">
+          <option value="pix">PIX</option>
+          <option value="dinheiro">Dinheiro</option>
+          <option value="credito">Cartão de Crédito</option>
+          <option value="debito">Cartão de Débito</option>
+          <option value="ted">TED / Transferência</option>
+        </select>
+      </div>
+    </div>
+    <div class="field"><label>Descrição</label><input id="mov-desc" placeholder="Ex: Rex — hospedagem (saldo)"/></div>
+    <div class="modal-foot">
+      <button class="btn" onclick="fecharModal('modal-movimentacao')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarMovimentacao()"><i class="ti ti-check"></i>Registrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL LEAD -->
+<div class="overlay" id="modal-lead">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-user-plus" style="color:var(--orange)"></i>Novo Lead / Contato</div>
+    <div class="row3">
+      <div class="field"><label>Nome</label><input id="lead-nome" placeholder="Nome do tutor"/></div>
+      <div class="field"><label>Telefone</label><input id="lead-tel" placeholder="(21) 99999-0000"/></div>
+      <div class="field"><label>Pet / Raça</label><input id="lead-pet" placeholder="Ex: Golden Retriever"/></div>
+    </div>
+    <div class="row3">
+      <div class="field"><label>Serviço de interesse</label>
+        <select id="lead-servico">
+          <option value="hospedagem">Hospedagem</option>
+          <option value="internato">Internato</option>
+          <option value="creche">Creche</option>
+          <option value="day_use">Day Use</option>
+          <option value="banho_tosa">Banho & Tosa</option>
+          <option value="adestramento">Adestramento</option>
+          <option value="passeio">Passeio</option>
+        </select>
+      </div>
+      <div class="field"><label>Canal de origem</label>
+        <select id="lead-canal">
+          <option value="whatsapp">WhatsApp</option>
+          <option value="instagram">Instagram</option>
+          <option value="indicacao">Indicação</option>
+          <option value="google">Google</option>
+          <option value="telefone">Telefone</option>
+          <option value="presencial">Presencial</option>
+        </select>
+      </div>
+      <div class="field"><label>Temperatura</label>
+        <select id="lead-temp">
+          <option value="quente">🔥 Quente</option>
+          <option value="morno">🟡 Morno</option>
+          <option value="frio">❄️ Frio</option>
+        </select>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Motivo não fechou</label>
+        <select id="lead-motivo">
+          <option value="">Ainda não contactei</option>
+          <option value="preco">Preço alto</option>
+          <option value="pensar">Precisa pensar</option>
+          <option value="concorrente">Escolheu concorrente</option>
+          <option value="data">Data indisponível</option>
+          <option value="sem_resposta">Sem resposta</option>
+        </select>
+      </div>
+      <div class="field"><label>Próximo follow-up</label><input type="date" id="lead-followup"/></div>
+    </div>
+    <div class="field"><label>Observações</label><textarea id="lead-obs" rows="2" placeholder="Detalhes da conversa, necessidades..."></textarea></div>
+    <div class="modal-foot">
+      <button class="btn" onclick="fecharModal('modal-lead')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarLead()"><i class="ti ti-check"></i>Salvar lead</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL META -->
+<div class="overlay" id="modal-meta">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-target" style="color:var(--orange)"></i>Configurar Meta Mensal</div>
+    <div class="field"><label>Mês de referência</label><input type="month" id="meta-mes"/></div>
+    <div class="field"><label>Meta total (R$)</label><input type="number" id="meta-total" placeholder="Ex: 18000"/></div>
+    <div style="font-size:11px;font-weight:600;color:var(--brown-mid);margin:10px 0 8px;text-transform:uppercase;letter-spacing:.05em">Metas por serviço (opcional)</div>
+    <div class="row2">
+      <div class="field"><label>Hospedagem</label><input type="number" id="meta-hosp" placeholder="0"/></div>
+      <div class="field"><label>Internato</label><input type="number" id="meta-intern" placeholder="0"/></div>
+      <div class="field"><label>Creche</label><input type="number" id="meta-creche" placeholder="0"/></div>
+      <div class="field"><label>Banho & Tosa</label><input type="number" id="meta-banho" placeholder="0"/></div>
+      <div class="field"><label>Passeios</label><input type="number" id="meta-passeio" placeholder="0"/></div>
+      <div class="field"><label>Acessórios</label><input type="number" id="meta-acess" placeholder="0"/></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="fecharModal('modal-meta')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarMeta()"><i class="ti ti-check"></i>Salvar meta</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PARCEIRO -->
+<div class="overlay" id="modal-parceiro">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-handshake" style="color:var(--orange)"></i>Novo Parceiro</div>
+    <div class="row2">
+      <div class="field"><label>Nome / @perfil</label><input id="parc-nome" placeholder="Ex: @petlover_rio"/></div>
+      <div class="field"><label>Tipo</label>
+        <select id="parc-tipo">
+          <option value="blogueiro">Blogueiro / Influencer</option>
+          <option value="adestrador">Adestrador</option>
+          <option value="banhista">Profissional de Banho & Tosa</option>
+          <option value="outro">Outro</option>
+        </select>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Canal</label>
+        <select id="parc-canal">
+          <option value="instagram">Instagram</option>
+          <option value="tiktok">TikTok</option>
+          <option value="youtube">YouTube</option>
+          <option value="whatsapp">WhatsApp</option>
+          <option value="presencial">Presencial</option>
+        </select>
+      </div>
+      <div class="field"><label>Telefone / PIX</label><input id="parc-tel" placeholder="(21) 99999-0000"/></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>% de repasse</label><input type="number" id="parc-pct" placeholder="Ex: 15" min="0" max="100"/></div>
+      <div class="field"><label>Chave PIX</label><input id="parc-pix" placeholder="CPF, e-mail ou telefone"/></div>
+    </div>
+    <div class="field"><label>Observações</label><textarea id="parc-obs" rows="2" placeholder="Combinados, detalhes da parceria..."></textarea></div>
+    <div class="modal-foot">
+      <button class="btn" onclick="fecharModal('modal-parceiro')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarParceiro()"><i class="ti ti-check"></i>Cadastrar parceiro</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PRODUTO -->
+<div class="overlay" id="modal-produto">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-package" style="color:var(--orange)"></i>Novo Produto</div>
+    <div class="row2">
+      <div class="field"><label>Nome do produto</label><input id="prod-nome" placeholder="Ex: Coleira nylon M"/></div>
+      <div class="field"><label>Categoria</label>
+        <select id="prod-cat">
+          <option value="coleiras_guias">Coleiras & Guias</option>
+          <option value="brinquedos">Brinquedos</option>
+          <option value="alimentacao">Alimentação</option>
+          <option value="camas">Camas & Almofadas</option>
+          <option value="higiene">Higiene</option>
+          <option value="outro">Outro</option>
+        </select>
+      </div>
+    </div>
+    <div class="row3">
+      <div class="field"><label>Preço (R$)</label><input type="number" id="prod-preco" placeholder="0.00" step="0.01"/></div>
+      <div class="field"><label>Estoque atual</label><input type="number" id="prod-estoque" placeholder="0"/></div>
+      <div class="field"><label>Estoque mínimo</label><input type="number" id="prod-min" placeholder="3"/></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="fecharModal('modal-produto')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarProduto()"><i class="ti ti-check"></i>Cadastrar produto</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SERVICO -->
+<div class="overlay" id="modal-servico">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-star" style="color:var(--orange)"></i>Novo Serviço / Editar Preço</div>
+    <div class="row2">
+      <div class="field"><label>Nome do serviço</label><input id="svc-nome" placeholder="Ex: Banho & Tosa"/></div>
+      <div class="field"><label>Tipo</label>
+        <select id="svc-tipo">
+          <option value="hospedagem">Hospedagem</option>
+          <option value="internato">Internato</option>
+          <option value="creche">Creche</option>
+          <option value="day_use">Day Use</option>
+          <option value="banho_tosa">Banho & Tosa</option>
+          <option value="adestramento">Adestramento</option>
+          <option value="passeio">Passeio</option>
+          <option value="acessorio">Acessório</option>
+        </select>
+      </div>
+    </div>
+    <div class="row3">
+      <div class="field"><label>Preço Pequeno (R$)</label><input type="number" id="svc-p" placeholder="0.00" step="0.01"/></div>
+      <div class="field"><label>Preço Médio (R$)</label><input type="number" id="svc-m" placeholder="0.00" step="0.01"/></div>
+      <div class="field"><label>Preço Grande (R$)</label><input type="number" id="svc-g" placeholder="0.00" step="0.01"/></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="fecharModal('modal-servico')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarServico()"><i class="ti ti-check"></i>Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ====== SUPABASE CONFIG ======
+const SUPA_URL = 'https://ypiggxchrmtaktdhxmfq.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlwaWdneGNocm10YWt0ZGh4bWZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2Nzg2MjksImV4cCI6MjA5NDI1NDYyOX0.BXl6QL1Oj66SJzRXaIC1UhFXqxo6rKYJWosJKp5VTqo';
+const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+// ====== ESTADO ======
+let currentUser = null;
+let agendaMes = new Date();
+let todosReservas = [];
+let todosTutores = [];
+
+// ====== UTILS ======
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(() => t.className = 'toast', 3000);
+}
+function abrirModal(id) { document.getElementById(id).classList.add('on'); }
+function fecharModal(id) { document.getElementById(id).classList.remove('on'); }
+function fmtMoeda(v) { return 'R$' + (Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtData(d) { if(!d) return '—'; const p=d.split('-'); return p[2]+'/'+p[1]+'/'+p[0].slice(2); }
+function iniciais(nome) { if(!nome) return '??'; const p=nome.trim().split(' '); return (p[0][0]+(p[1]?p[1][0]:'')).toUpperCase(); }
+function corServico(s) {
+  const m={hospedagem:'bdg-gold',internato:'bdg-brown',creche:'bdg-sage',day_use:'bdg-green',banho_tosa:'bdg-blue',adestramento:'bdg-orange',passeio:'bdg-purple',acessorio:'bdg-gray'};
+  return m[s]||'bdg-gray';
+}
+function labelServico(s) {
+  const m={hospedagem:'Hospedagem',internato:'Internato',creche:'Creche',day_use:'Day Use',banho_tosa:'Banho & Tosa',adestramento:'Adestramento',passeio:'Passeio',acessorio:'Acessório'};
+  return m[s]||s;
+}
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  if(window.innerWidth <= 768) { sb.classList.toggle('mobile-open'); }
+  else { sb.classList.toggle('collapsed'); }
+}
+
+// ====== AUTH ======
+async function fazerLogin() {
+  const email = document.getElementById('login-email').value;
+  const senha = document.getElementById('login-senha').value;
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  if(!email || !senha) { errEl.textContent='Preencha e-mail e senha.'; errEl.style.display='block'; return; }
+  const { data, error } = await supa.auth.signInWithPassword({ email, password: senha });
+  if(error) { errEl.textContent='E-mail ou senha incorretos.'; errEl.style.display='block'; return; }
+  currentUser = data.user;
+  iniciarApp();
+}
+async function fazerLogout() {
+  await supa.auth.signOut();
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('login-screen').style.display='flex';
+}
+async function verificarSessao() {
+  const { data } = await supa.auth.getSession();
+  if(data.session) { currentUser = data.session.user; iniciarApp(); }
+}
+function iniciarApp() {
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').classList.add('visible');
+  const nome = currentUser.email.split('@')[0];
+  document.getElementById('user-avatar').textContent = iniciais(nome);
+  document.getElementById('user-name').textContent = nome;
+  carregarDashboard();
+  carregarTutores();
+  carregarAgenda();
+  carregarVagas();
+}
+
+// ====== NAVEGAÇÃO ======
+function nav(pg, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
+  document.querySelectorAll('.sb-item').forEach(i => i.classList.remove('on'));
+  document.getElementById('page-'+pg).classList.add('on');
+  if(el) el.classList.add('on');
+  if(pg==='reservas') carregarReservas();
+  if(pg==='pets') renderTutores();
+  if(pg==='servicos') carregarServicos();
+  if(pg==='loja') carregarProdutos();
+  if(pg==='crm') carregarLeads();
+  if(pg==='parcerias') carregarParceiros();
+  if(pg==='financeiro') carregarFinanceiro();
+  if(pg==='caixa') carregarCaixa();
+  if(pg==='relatorios') carregarRelatorios();
+  if(window.innerWidth<=768) document.getElementById('sidebar').classList.remove('mobile-open');
+}
+
+// ====== DASHBOARD ======
+async function carregarDashboard() {
+  try {
+    const hoje = new Date().toISOString().split('T')[0];
+    const mesAtual = hoje.slice(0,7);
+
+    const [resv, movs, metas, leads] = await Promise.all([
+      supa.from('reservas').select('*,pets(nome,raca),tutores(nome)').eq('status_reserva','em_andamento'),
+      supa.from('movimentacoes').select('tipo,valor').gte('data_movimentacao', mesAtual+'-01'),
+      supa.from('metas').select('*').eq('mes_referencia', mesAtual).single(),
+      supa.from('leads').select('*').lte('proximo_followup', hoje).neq('etapa','convertido').neq('etapa','perdido')
+    ]);
+
+    const ativos = resv.data||[];
+    const movData = movs.data||[];
+    const metaData = metas.data;
+    const leadsHoje = leads.data||[];
+
+    const receita = movData.filter(m=>m.tipo==='entrada').reduce((a,b)=>a+(Number(b.valor)||0),0);
+    const despesa = movData.filter(m=>m.tipo==='saida').reduce((a,b)=>a+(Number(b.valor)||0),0);
+    const creche = ativos.filter(r=>r.servico_tipo==='creche'||r.servico_tipo==='day_use').length;
+    const internato = ativos.filter(r=>r.servico_tipo==='internato').length;
+
+    document.getElementById('dashboard-metrics').innerHTML = `
+      <div class="met"><div class="met-lbl">No estabelecimento</div><div class="met-val c-sage">${ativos.length}</div><div class="met-sub">hospedados agora</div></div>
+      <div class="met"><div class="met-lbl">Receita do mês</div><div class="met-val c-gold">${fmtMoeda(receita)}</div><div class="met-sub">${metaData?Math.round(receita/metaData.meta_total*100)+'% da meta':'sem meta definida'}</div></div>
+      <div class="met"><div class="met-lbl">Lucro líquido</div><div class="met-val c-green">${fmtMoeda(receita-despesa)}</div></div>
+      <div class="met"><div class="met-lbl">Creche / Day Use</div><div class="met-val c-orange">${creche}</div><div class="met-sub">hoje</div></div>
+      <div class="met"><div class="met-lbl">Internatos</div><div class="met-val c-brown">${internato}</div><div class="met-sub">ativos</div></div>
+      <div class="met"><div class="met-lbl">Follow-ups</div><div class="met-val c-red">${leadsHoje.length}</div><div class="met-sub">pendentes hoje</div></div>
+    `;
+
+    // META BAR
+    if(metaData) {
+      const pct = Math.min(Math.round(receita/metaData.meta_total*100),100);
+      const faltam = Math.max(metaData.meta_total - receita, 0);
+      document.getElementById('dashboard-meta').innerHTML = `
+        <div class="card" style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <span style="font-size:13px;font-weight:600">🎯 Meta de ${mesAtual.split('-')[1]}/${mesAtual.split('-')[0]} — ${fmtMoeda(metaData.meta_total)}</span>
+            <span style="font-size:20px;font-weight:700;color:var(--orange)">${pct}%</span>
+          </div>
+          <div class="meta-bar-track"><div class="meta-bar-fill" style="width:${pct}%"></div></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--brown-mid)">
+            <span>${fmtMoeda(receita)} realizado</span>
+            <span style="color:var(--orange)">Faltam ${fmtMoeda(faltam)}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    // ALERTAS
+    const alertas = [];
+    if(leadsHoje.length > 0) alertas.push(`<div class="alert alert-red"><i class="ti ti-bell"></i><span><b>${leadsHoje.length} follow-up(s)</b> pendente(s) hoje</span></div>`);
+    if(ativos.length === 0) alertas.push(`<div class="alert alert-sage"><i class="ti ti-check"></i><span>Nenhum pet hospedado no momento</span></div>`);
+    if(alertas.length===0) alertas.push(`<div class="alert alert-green"><i class="ti ti-check"></i><span>Sem alertas no momento</span></div>`);
+    document.getElementById('dashboard-alertas').innerHTML = alertas.join('');
+
+    // PETS ATIVOS
+    if(ativos.length === 0) {
+      document.getElementById('dashboard-pets').innerHTML = '<div style="text-align:center;padding:20px;color:var(--brown-mid);font-size:12px">Nenhum pet hospedado</div>';
+    } else {
+      document.getElementById('dashboard-pets').innerHTML = ativos.slice(0,5).map(r=>`
+        <div class="tutor-row">
+          <div class="av">${iniciais(r.pets?.nome||'?')}</div>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:600">${r.pets?.nome||'—'}</div>
+            <div style="font-size:10px;color:var(--brown-mid)">${r.tutores?.nome||'—'} · ${r.pets?.raca||''}</div>
+          </div>
+          <div style="text-align:right">
+            <span class="bdg ${corServico(r.servico_tipo)}">${labelServico(r.servico_tipo)}</span>
+            <div style="font-size:10px;color:var(--brown-mid);margin-top:3px">Saída: ${fmtData(r.data_saida)}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+  } catch(e) {
+    console.error(e);
+    showToast('Erro ao carregar painel', 'error');
+  }
+}
+
+// ====== RESERVAS ======
+async function carregarReservas() {
+  document.getElementById('tbl-reservas').innerHTML = '<tr><td colspan="10" class="tbl-empty"><div class="loading"><div class="spinner"></div>Carregando...</div></td></tr>';
+  const { data, error } = await supa.from('reservas').select('*,pets(nome),tutores(nome)').order('criado_em',{ascending:false}).limit(100);
+  if(error) { showToast('Erro ao carregar reservas','error'); return; }
+  todosReservas = data||[];
+  renderReservas(todosReservas);
+  carregarTutoresSelect();
+}
+function renderReservas(lista) {
+  if(!lista.length) { document.getElementById('tbl-reservas').innerHTML='<tr><td colspan="10" class="tbl-empty">Nenhuma reserva encontrada</td></tr>'; return; }
+  document.getElementById('tbl-reservas').innerHTML = lista.map(r=>`
+    <tr>
+      <td style="color:var(--brown-mid);font-size:10px">#${r.numero_reserva||'—'}</td>
+      <td><b>${r.pets?.nome||'—'}</b></td>
+      <td style="font-size:11px">${r.tutores?.nome||'—'}</td>
+      <td><span class="bdg ${corServico(r.servico_tipo)}">${labelServico(r.servico_tipo)}</span></td>
+      <td>${fmtData(r.data_entrada)}</td>
+      <td>${fmtData(r.data_saida)||'—'}</td>
+      <td style="font-weight:600">${fmtMoeda(r.valor_total)}</td>
+      <td><span class="bdg ${r.status_pagamento==='pago'?'bdg-green':r.status_pagamento==='parcial'?'bdg-gold':'bdg-orange'}">${r.status_pagamento}</span></td>
+      <td><span class="bdg ${r.status_reserva==='em_andamento'?'bdg-sage':r.status_reserva==='concluida'?'bdg-green':'bdg-blue'}">${r.status_reserva?.replace('_',' ')}</span></td>
+      <td><button class="btn btn-xs" onclick="verReserva('${r.id}')">Ver</button></td>
+    </tr>
+  `).join('');
+}
+function filtrarReservas() {
+  const q = document.getElementById('filtro-reserva').value.toLowerCase();
+  const s = document.getElementById('filtro-reserva-status').value;
+  const filtrado = todosReservas.filter(r=>{
+    const match = !q || (r.pets?.nome||'').toLowerCase().includes(q) || (r.tutores?.nome||'').toLowerCase().includes(q);
+    const matchS = !s || r.status_reserva===s;
+    return match && matchS;
+  });
+  renderReservas(filtrado);
+}
+function verReserva(id) { showToast('Detalhes da reserva em breve!'); }
+
+async function salvarReserva() {
+  const tutId = document.getElementById('res-tutor').value;
+  const petId = document.getElementById('res-pet').value;
+  const entrada = document.getElementById('res-entrada').value;
+  if(!tutId||!petId||!entrada) { showToast('Preencha tutor, pet e data de entrada','error'); return; }
+  const { error } = await supa.from('reservas').insert({
+    tutor_id: tutId, pet_id: petId,
+    servico_tipo: document.getElementById('res-servico').value,
+    data_entrada: entrada,
+    data_saida: document.getElementById('res-saida').value||null,
+    valor_total: Number(document.getElementById('res-valor').value)||0,
+    forma_pagamento: document.getElementById('res-pgto').value,
+    status_pagamento: document.getElementById('res-status-pgto').value,
+    status_reserva: 'confirmada',
+    origem: document.getElementById('res-origem').value,
+    numero_vaga: Number(document.getElementById('res-vaga').value)||null,
+    observacoes: document.getElementById('res-obs').value||null
+  });
+  if(error) { showToast('Erro ao salvar reserva','error'); return; }
+  fecharModal('modal-reserva');
+  showToast('Reserva criada com sucesso!','success');
+  carregarDashboard();
+  carregarAgenda();
+  carregarVagas();
+}
+
+// ====== TUTORES ======
+async function carregarTutores() {
+  const { data } = await supa.from('tutores').select('*,pets(*)').order('criado_em',{ascending:false});
+  todosTutores = data||[];
+  renderTutores();
+}
+function renderTutores() {
+  const q = (document.getElementById('filtro-tutor')?.value||'').toLowerCase();
+  const lista = todosTutores.filter(t => !q || t.nome.toLowerCase().includes(q) || (t.pets||[]).some(p=>p.nome.toLowerCase().includes(q)));
+  if(!lista.length) { document.getElementById('lista-tutores').innerHTML='<div style="text-align:center;padding:20px;color:var(--brown-mid);font-size:12px">Nenhum tutor cadastrado ainda</div>'; return; }
+  document.getElementById('lista-tutores').innerHTML = lista.map(t=>`
+    <div class="tutor-row">
+      <div class="av">${iniciais(t.nome)}</div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600">${t.nome}</div>
+        <div style="font-size:11px;color:var(--brown-mid)">${t.telefone||''} ${t.email?'· '+t.email:''}</div>
+        <div style="display:flex;gap:5px;margin-top:4px;flex-wrap:wrap">
+          ${(t.pets||[]).map(p=>`<span class="bdg bdg-gold">${p.nome} · ${p.raca||''}</span>`).join('')}
+        </div>
+      </div>
+      <div style="text-align:right">
+        <span class="bdg bdg-${t.como_conheceu==='trafego_pago'?'blue':t.como_conheceu==='blogueiro'?'purple':t.como_conheceu==='adestrador'?'sage':'gray'}" style="font-size:9px">${t.como_conheceu||'orgânico'}</span>
+      </div>
+    </div>
+  `).join('');
+}
+function filtrarTutores() { renderTutores(); }
+async function carregarTutoresSelect() {
+  const sel = document.getElementById('res-tutor');
+  sel.innerHTML = '<option value="">Selecionar tutor...</option>' + todosTutores.map(t=>`<option value="${t.id}">${t.nome}</option>`).join('');
+}
+async function carregarPetsDoTutor() {
+  const tutId = document.getElementById('res-tutor').value;
+  const tutor = todosTutores.find(t=>t.id===tutId);
+  const sel = document.getElementById('res-pet');
+  if(!tutor||!tutor.pets?.length) { sel.innerHTML='<option value="">Sem pets cadastrados</option>'; return; }
+  sel.innerHTML = tutor.pets.map(p=>`<option value="${p.id}">${p.nome} (${p.raca||'sem raça'})</option>`).join('');
+}
+async function salvarTutor() {
+  const nome = document.getElementById('tut-nome').value;
+  if(!nome) { showToast('Informe o nome do tutor','error'); return; }
+  const { data: tutData, error: tutErr } = await supa.from('tutores').insert({
+    nome, telefone: document.getElementById('tut-tel').value,
+    email: document.getElementById('tut-email').value,
+    como_conheceu: document.getElementById('tut-origem').value
+  }).select().single();
+  if(tutErr) { showToast('Erro ao salvar tutor','error'); return; }
+  const nomePet = document.getElementById('pet-nome').value;
+  if(nomePet) {
+    await supa.from('pets').insert({
+      tutor_id: tutData.id, nome: nomePet,
+      raca: document.getElementById('pet-raca').value,
+      porte: document.getElementById('pet-porte').value,
+      sexo: document.getElementById('pet-sexo').value,
+      idade_anos: Number(document.getElementById('pet-idade').value)||null,
+      peso_kg: Number(document.getElementById('pet-peso').value)||null,
+      vacina_v8_vencimento: document.getElementById('pet-v8').value||null,
+      vacina_antirabica_vencimento: document.getElementById('pet-antirrab').value||null,
+      medicacao: document.getElementById('pet-med').value||null,
+      observacoes: document.getElementById('pet-obs').value||null
+    });
+  }
+  fecharModal('modal-tutor');
+  showToast('Tutor e pet cadastrados!','success');
+  carregarTutores();
+}
+
+// ====== AGENDA ======
+async function carregarAgenda() {
+  const ano = agendaMes.getFullYear();
+  const mes = agendaMes.getMonth();
+  const mStr = String(mes+1).padStart(2,'0');
+  document.getElementById('agenda-titulo').textContent = agendaMes.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+  const { data } = await supa.from('reservas').select('data_entrada,data_saida,servico_tipo,pets(nome)')
+    .gte('data_entrada',`${ano}-${mStr}-01`).lte('data_entrada',`${ano}-${mStr}-31`);
+  renderAgenda(data||[], ano, mes);
+}
+function renderAgenda(reservas, ano, mes) {
+  const grid = document.getElementById('agenda-grid');
+  grid.innerHTML='';
+  const primeiroDia = new Date(ano,mes,1).getDay();
+  const diasNoMes = new Date(ano,mes+1,0).getDate();
+  const hoje = new Date().toISOString().split('T')[0];
+  for(let i=0;i<primeiroDia;i++) { const d=document.createElement('div'); d.style.minHeight='60px'; grid.appendChild(d); }
+  for(let d=1;d<=diasNoMes;d++) {
+    const dStr = `${ano}-${String(mes+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const evs = reservas.filter(r=>r.data_entrada===dStr);
+    const cell = document.createElement('div');
+    cell.style.cssText='min-height:60px;background:var(--bg);border-radius:6px;padding:5px;font-size:10px;border:1px solid transparent';
+    if(dStr===hoje) cell.style.cssText='min-height:60px;background:var(--orange-light);border-radius:6px;padding:5px;font-size:10px;border:2px solid var(--orange)';
+    const corEv={hospedagem:'var(--gold-light)',internato:'var(--brown-light)',creche:'var(--sage-light)',day_use:'var(--green-light)',banho_tosa:'var(--blue-light)',adestramento:'var(--orange-light)',passeio:'var(--purple-light)'};
+    cell.innerHTML=`<div style="font-weight:700;color:var(--brown-mid);margin-bottom:3px;font-size:11px">${d}</div>${evs.map(e=>`<div style="background:${corEv[e.servico_tipo]||'#eee'};border-radius:3px;padding:1px 4px;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${e.pets?.nome||labelServico(e.servico_tipo)}</div>`).join('')}`;
+    grid.appendChild(cell);
+  }
+}
+function mudarMes(d) { agendaMes.setMonth(agendaMes.getMonth()+d); carregarAgenda(); }
+
+// ====== VAGAS ======
+async function carregarVagas() {
+  const hoje = new Date().toISOString().split('T')[0];
+  const { data } = await supa.from('reservas').select('numero_vaga,servico_tipo').eq('status_reserva','em_andamento').not('numero_vaga','is',null);
+  const vagasOcup = data||[];
+  renderVagas('vagas-hosp', 24, vagasOcup, ['hospedagem','internato']);
+  renderVagas('vagas-creche', 15, vagasOcup, ['creche']);
+  renderVagas('vagas-dayuse', 6, vagasOcup, ['day_use']);
+}
+function renderVagas(elId, total, ocupadas, tipos) {
+  const el = document.getElementById(elId);
+  el.innerHTML='';
+  for(let i=1;i<=total;i++){
+    const oc = ocupadas.find(v=>v.numero_vaga===i && tipos.includes(v.servico_tipo));
+    const v = document.createElement('div');
+    v.style.cssText='aspect-ratio:1;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;cursor:pointer;transition:transform .12s;border:1px solid transparent';
+    if(oc) {
+      if(oc.servico_tipo==='internato') v.style.cssText+=';background:var(--brown-light);color:var(--brown);border-color:#c5a898';
+      else v.style.cssText+=';background:var(--gold-light);color:#8a6018;border-color:var(--gold-mid)';
+    } else { v.style.cssText+=';background:var(--green-light);color:var(--green);border-color:#b5d9c5'; }
+    v.textContent=i;
+    v.onmouseenter=()=>v.style.transform='scale(1.1)';
+    v.onmouseleave=()=>v.style.transform='';
+    el.appendChild(v);
+  }
+}
+
+// ====== SERVIÇOS ======
+async function carregarServicos() {
+  const { data } = await supa.from('servicos').select('*').eq('ativo',true).order('nome');
+  if(!data?.length) { document.getElementById('lista-servicos').innerHTML='<div style="text-align:center;padding:20px;color:var(--brown-mid)">Nenhum serviço cadastrado</div>'; return; }
+  document.getElementById('lista-servicos').innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">${data.map(s=>`
+    <div class="card">
+      <div style="font-size:13px;font-weight:700;color:var(--brown);margin-bottom:4px">${s.nome}</div>
+      <div style="font-size:10px;color:var(--brown-mid);margin-bottom:10px">${labelServico(s.tipo)}</div>
+      ${s.preco_pequeno?`<div style="font-size:11px;color:var(--brown-mid)">Pequeno: <b style="color:var(--orange)">${fmtMoeda(s.preco_pequeno)}</b></div>`:''}
+      ${s.preco_medio?`<div style="font-size:11px;color:var(--brown-mid)">Médio: <b style="color:var(--orange)">${fmtMoeda(s.preco_medio)}</b></div>`:''}
+      ${s.preco_grande?`<div style="font-size:11px;color:var(--brown-mid)">Grande: <b style="color:var(--orange)">${fmtMoeda(s.preco_grande)}</b></div>`:''}
+    </div>
+  `).join('')}</div>`;
+}
+async function salvarServico() {
+  const { error } = await supa.from('servicos').insert({
+    nome: document.getElementById('svc-nome').value,
+    tipo: document.getElementById('svc-tipo').value,
+    preco_pequeno: Number(document.getElementById('svc-p').value)||null,
+    preco_medio: Number(document.getElementById('svc-m').value)||null,
+    preco_grande: Number(document.getElementById('svc-g').value)||null,
+  });
+  if(error) { showToast('Erro ao salvar serviço','error'); return; }
+  fecharModal('modal-servico');
+  showToast('Serviço salvo!','success');
+  carregarServicos();
+}
+
+// ====== LOJA ======
+async function carregarProdutos() {
+  const { data } = await supa.from('produtos').select('*').eq('ativo',true).order('nome');
+  if(!data?.length) { document.getElementById('lista-produtos').innerHTML='<div class="card"><div style="text-align:center;padding:20px;color:var(--brown-mid)">Nenhum produto cadastrado ainda</div></div>'; return; }
+  document.getElementById('lista-produtos').innerHTML = `<div class="card"><table class="tbl"><thead><tr><th>Produto</th><th>Categoria</th><th>Preço</th><th>Estoque</th><th>Status</th></tr></thead><tbody>${data.map(p=>`
+    <tr>
+      <td><b>${p.nome}</b></td>
+      <td>${p.categoria?.replace('_',' ')}</td>
+      <td style="font-weight:600;color:var(--orange)">${fmtMoeda(p.preco)}</td>
+      <td><span class="bdg ${p.estoque<=p.estoque_minimo?'bdg-red':'bdg-green'}">${p.estoque} unid.</span></td>
+      <td>${p.estoque<=p.estoque_minimo?'<span class="bdg bdg-red">Estoque baixo</span>':'<span class="bdg bdg-green">OK</span>'}</td>
+    </tr>
+  `).join('')}</tbody></table></div>`;
+}
+async function salvarProduto() {
+  const { error } = await supa.from('produtos').insert({
+    nome: document.getElementById('prod-nome').value,
+    categoria: document.getElementById('prod-cat').value,
+    preco: Number(document.getElementById('prod-preco').value)||0,
+    estoque: Number(document.getElementById('prod-estoque').value)||0,
+    estoque_minimo: Number(document.getElementById('prod-min').value)||3
+  });
+  if(error) { showToast('Erro ao salvar produto','error'); return; }
+  fecharModal('modal-produto');
+  showToast('Produto cadastrado!','success');
+  carregarProdutos();
+}
+
+// ====== CRM ======
+async function carregarLeads() {
+  const { data } = await supa.from('leads').select('*').order('criado_em',{ascending:false});
+  const leads = data||[];
+  const etapas = ['novo','contactado','interesse','proposta','perdido'];
+  const nomes = {novo:'Novo contato',contactado:'Contactado',interesse:'Com interesse',proposta:'Proposta enviada',perdido:'Não fechou'};
+  const cores = {novo:'#f0e8e0',contactado:'var(--orange-light)',interesse:'var(--gold-light)',proposta:'var(--sage-light)',perdido:'var(--red-light)'};
+  document.getElementById('funil-leads').innerHTML = etapas.map(e=>{
+    const grupo = leads.filter(l=>l.etapa===e);
+    return `<div class="funil-col"><div class="funil-head" style="background:${cores[e]}">${nomes[e]} <span style="background:rgba(0,0,0,.1);border-radius:100px;padding:0 6px;font-size:10px">${grupo.length}</span></div><div class="funil-body">${grupo.map(l=>`<div class="lead-card"><div class="lead-name">${l.nome}</div><div class="lead-sub">${l.nome_pet||''} · ${labelServico(l.servico_interesse)||''}</div><span class="bdg ${l.temperatura==='quente'?'bdg-red':l.temperatura==='morno'?'bdg-gold':'bdg-blue'}" style="font-size:9px">${l.temperatura}</span></div>`).join('')}</div></div>`;
+  }).join('');
+  const hoje = new Date().toISOString().split('T')[0];
+  const followups = leads.filter(l=>l.proximo_followup&&l.proximo_followup<=hoje&&l.etapa!=='convertido'&&l.etapa!=='perdido');
+  if(!followups.length) { document.getElementById('lista-followups').innerHTML='<div style="text-align:center;padding:16px;color:var(--brown-mid);font-size:12px">Nenhum follow-up pendente</div>'; return; }
+  document.getElementById('lista-followups').innerHTML = followups.map(l=>`
+    <div class="tutor-row">
+      <div class="av">${iniciais(l.nome)}</div>
+      <div style="flex:1"><div style="font-size:12px;font-weight:600">${l.nome}</div><div style="font-size:10px;color:var(--brown-mid)">${l.nome_pet||''} · ${labelServico(l.servico_interesse)||''} · ${l.canal_origem}</div></div>
+      <div style="text-align:right"><span class="bdg ${l.proximo_followup<hoje?'bdg-red':'bdg-orange'}">${l.proximo_followup<hoje?'Atrasado':'Hoje'}</span></div>
+    </div>
+  `).join('');
+}
+async function salvarLead() {
+  const nome = document.getElementById('lead-nome').value;
+  if(!nome) { showToast('Informe o nome','error'); return; }
+  const { error } = await supa.from('leads').insert({
+    nome, telefone: document.getElementById('lead-tel').value,
+    nome_pet: document.getElementById('lead-pet').value,
+    servico_interesse: document.getElementById('lead-servico').value,
+    canal_origem: document.getElementById('lead-canal').value,
+    temperatura: document.getElementById('lead-temp').value,
+    motivo_nao_fechou: document.getElementById('lead-motivo').value||null,
+    proximo_followup: document.getElementById('lead-followup').value||null,
+    observacoes: document.getElementById('lead-obs').value||null,
+    etapa: 'novo'
+  });
+  if(error) { showToast('Erro ao salvar lead','error'); return; }
+  fecharModal('modal-lead');
+  showToast('Lead cadastrado!','success');
+  carregarLeads();
+}
+
+// ====== PARCERIAS ======
+async function carregarParceiros() {
+  const { data } = await supa.from('parceiros').select('*').eq('ativo',true).order('nome');
+  if(!data?.length) { document.getElementById('lista-parceiros').innerHTML='<div class="card"><div style="text-align:center;padding:20px;color:var(--brown-mid)">Nenhum parceiro cadastrado ainda</div></div>'; return; }
+  document.getElementById('lista-parceiros').innerHTML = data.map(p=>`
+    <div class="card" style="margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div class="av" style="background:${p.tipo==='blogueiro'?'var(--purple-light)':'var(--sage-light)'};color:${p.tipo==='blogueiro'?'var(--purple)':'var(--sage)'}">${iniciais(p.nome)}</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600">${p.nome}</div>
+          <div style="font-size:11px;color:var(--brown-mid)">${p.tipo} · ${p.canal||''}</div>
+        </div>
+        <span class="bdg ${p.tipo==='blogueiro'?'bdg-purple':'bdg-sage'}">${p.tipo}</span>
+        <span style="font-size:18px;font-weight:700;color:var(--orange)">${p.percentual_repasse}%</span>
+      </div>
+      <div style="display:flex;gap:8px;font-size:11px;color:var(--brown-mid)">
+        ${p.telefone?`<span><i class="ti ti-phone" style="font-size:13px"></i> ${p.telefone}</span>`:''}
+        ${p.chave_pix?`<span><i class="ti ti-qrcode" style="font-size:13px"></i> PIX: ${p.chave_pix}</span>`:''}
+      </div>
+      ${p.observacoes?`<div style="font-size:11px;color:var(--brown-mid);margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">${p.observacoes}</div>`:''}
+    </div>
+  `).join('');
+}
+async function salvarParceiro() {
+  const nome = document.getElementById('parc-nome').value;
+  if(!nome) { showToast('Informe o nome do parceiro','error'); return; }
+  const { error } = await supa.from('parceiros').insert({
+    nome, tipo: document.getElementById('parc-tipo').value,
+    canal: document.getElementById('parc-canal').value,
+    telefone: document.getElementById('parc-tel').value,
+    chave_pix: document.getElementById('parc-pix').value,
+    percentual_repasse: Number(document.getElementById('parc-pct').value)||0,
+    observacoes: document.getElementById('parc-obs').value||null
+  });
+  if(error) { showToast('Erro ao salvar parceiro','error'); return; }
+  fecharModal('modal-parceiro');
+  showToast('Parceiro cadastrado!','success');
+  carregarParceiros();
+}
+
+// ====== CAIXA ======
+async function carregarCaixa() {
+  const hoje = new Date().toISOString().split('T')[0];
+  const { data } = await supa.from('movimentacoes').select('*').eq('data_movimentacao',hoje).order('criado_em',{ascending:false});
+  const movs = data||[];
+  const entradas = movs.filter(m=>m.tipo==='entrada').reduce((a,b)=>a+(Number(b.valor)||0),0);
+  const saidas = movs.filter(m=>m.tipo==='saida').reduce((a,b)=>a+(Number(b.valor)||0),0);
+  const pix = movs.filter(m=>m.tipo==='entrada'&&m.forma_pagamento==='pix').reduce((a,b)=>a+(Number(b.valor)||0),0);
+  document.getElementById('caixa-metrics').innerHTML = `
+    <div class="met"><div class="met-lbl">Entradas hoje</div><div class="met-val c-green">${fmtMoeda(entradas)}</div></div>
+    <div class="met"><div class="met-lbl">Saídas hoje</div><div class="met-val c-red">${fmtMoeda(saidas)}</div></div>
+    <div class="met"><div class="met-lbl">Saldo do dia</div><div class="met-val c-orange">${fmtMoeda(entradas-saidas)}</div></div>
+    <div class="met"><div class="met-lbl">Recebido via PIX</div><div class="met-val c-sage">${fmtMoeda(pix)}</div></div>
+  `;
+  if(!movs.length) { document.getElementById('tbl-caixa').innerHTML='<tr><td colspan="6" class="tbl-empty">Nenhuma movimentação hoje</td></tr>'; return; }
+  document.getElementById('tbl-caixa').innerHTML = movs.map(m=>`
+    <tr>
+      <td style="color:var(--brown-mid);font-size:11px">${m.hora_movimentacao?.slice(0,5)||'--:--'}</td>
+      <td>${m.descricao}</td>
+      <td><span class="bdg bdg-gray" style="font-size:10px">${m.categoria?.replace(/_/g,' ')}</span></td>
+      <td style="font-size:11px">${m.forma_pagamento?.toUpperCase()}</td>
+      <td><span class="bdg ${m.tipo==='entrada'?'bdg-green':'bdg-red'}">${m.tipo}</span></td>
+      <td style="font-weight:700;color:${m.tipo==='entrada'?'var(--green)':'var(--red)'}">${m.tipo==='entrada'?'+':'-'}${fmtMoeda(m.valor)}</td>
+    </tr>
+  `).join('');
+}
+async function salvarMovimentacao() {
+  const valor = Number(document.getElementById('mov-valor').value);
+  if(!valor) { showToast('Informe o valor','error'); return; }
+  const { error } = await supa.from('movimentacoes').insert({
+    tipo: document.getElementById('mov-tipo').value,
+    categoria: document.getElementById('mov-cat').value,
+    descricao: document.getElementById('mov-desc').value||'Sem descrição',
+    valor, forma_pagamento: document.getElementById('mov-pgto').value,
+    data_movimentacao: new Date().toISOString().split('T')[0],
+    hora_movimentacao: new Date().toTimeString().slice(0,5)
+  });
+  if(error) { showToast('Erro ao registrar','error'); return; }
+  fecharModal('modal-movimentacao');
+  showToast('Movimentação registrada!','success');
+  carregarCaixa();
+}
+
+// ====== FINANCEIRO ======
+async function carregarFinanceiro() {
+  const mesAtual = new Date().toISOString().slice(0,7);
+  const [movs, meta] = await Promise.all([
+    supa.from('movimentacoes').select('*').gte('data_movimentacao', mesAtual+'-01'),
+    supa.from('metas').select('*').eq('mes_referencia', mesAtual).single()
+  ]);
+  const movData = movs.data||[];
+  const metaData = meta.data;
+  const receita = movData.filter(m=>m.tipo==='entrada').reduce((a,b)=>a+(Number(b.valor)||0),0);
+  const despesa = movData.filter(m=>m.tipo==='saida').reduce((a,b)=>a+(Number(b.valor)||0),0);
+  const repasses = movData.filter(m=>m.tipo==='saida'&&(m.categoria==='repasse_parceiro'||m.categoria==='repasse_banhista')).reduce((a,b)=>a+(Number(b.valor)||0),0);
+  const trafego = movData.filter(m=>m.tipo==='saida'&&m.categoria==='trafego_pago').reduce((a,b)=>a+(Number(b.valor)||0),0);
+
+  document.getElementById('financeiro-metrics').innerHTML = `
+    <div class="met"><div class="met-lbl">Receita bruta</div><div class="met-val c-gold">${fmtMoeda(receita)}</div>${metaData?`<div class="met-sub">${Math.round(receita/metaData.meta_total*100)}% da meta</div>`:''}</div>
+    <div class="met"><div class="met-lbl">Repasses</div><div class="met-val c-purple">${fmtMoeda(repasses)}</div></div>
+    <div class="met"><div class="met-lbl">Tráfego pago</div><div class="met-val c-blue">${fmtMoeda(trafego)}</div></div>
+    <div class="met"><div class="met-lbl">Despesas totais</div><div class="met-val c-red">${fmtMoeda(despesa)}</div></div>
+    <div class="met"><div class="met-lbl">Lucro líquido</div><div class="met-val c-green">${fmtMoeda(receita-despesa)}</div></div>
+  `;
+
+  if(metaData) {
+    const pct = Math.min(Math.round(receita/metaData.meta_total*100),100);
+    document.getElementById('financeiro-meta').innerHTML = `
+      <div class="card" style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:13px;font-weight:600">🎯 Meta — ${fmtMoeda(metaData.meta_total)}</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:22px;font-weight:700;color:var(--orange)">${pct}%</span>
+            <span class="bdg bdg-orange">${fmtMoeda(receita)} realizado</span>
+          </div>
+        </div>
+        <div class="meta-bar-track"><div class="meta-bar-fill" style="width:${pct}%"></div></div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--brown-mid);margin-top:5px">
+          <span>R$0</span><span style="color:var(--orange)">Faltam ${fmtMoeda(Math.max(metaData.meta_total-receita,0))}</span><span>${fmtMoeda(metaData.meta_total)}</span>
+        </div>
+      </div>`;
+  }
+
+  // Receitas por categoria
+  const cats = {};
+  movData.filter(m=>m.tipo==='entrada').forEach(m=>{ cats[m.categoria]=(cats[m.categoria]||0)+(Number(m.valor)||0); });
+  const maxCat = Math.max(...Object.values(cats),1);
+  document.getElementById('financeiro-receitas').innerHTML = Object.entries(cats).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`
+    <div class="bar-row"><span class="bar-lbl">${labelServico(k)||k}</span><div class="bar-track"><div class="bar-fill" style="width:${Math.round(v/maxCat*100)}%;background:var(--orange)"></div></div><span class="bar-val c-orange">${fmtMoeda(v)}</span></div>
+  `).join('')||'<div style="color:var(--brown-mid);font-size:12px;padding:10px 0">Sem receitas registradas</div>';
+
+  // DRE
+  document.getElementById('financeiro-dre').innerHTML = `
+    <div class="sum-row c-green"><span style="font-weight:600">Receita bruta</span><span>${fmtMoeda(receita)}</span></div>
+    <div class="sum-row c-red"><span>(-) Repasses parceiros/banhistas</span><span>${fmtMoeda(repasses)}</span></div>
+    <div class="sum-row c-blue"><span>(-) Tráfego pago</span><span>${fmtMoeda(trafego)}</span></div>
+    <div class="sum-row c-red"><span>(-) Demais despesas</span><span>${fmtMoeda(despesa-repasses-trafego)}</span></div>
+    <div class="sum-row"><span>Lucro líquido</span><span style="color:var(--green);font-size:16px;font-weight:700">${fmtMoeda(receita-despesa)}</span></div>
+  `;
+  document.getElementById('financeiro-origens').innerHTML = '<div style="color:var(--brown-mid);font-size:12px;padding:10px 0">Dados de origem disponíveis conforme reservas são cadastradas com origem definida.</div>';
+}
+
+// ====== META ======
+async function salvarMeta() {
+  const mes = document.getElementById('meta-mes').value;
+  const total = Number(document.getElementById('meta-total').value);
+  if(!mes||!total) { showToast('Informe o mês e a meta total','error'); return; }
+  const { error } = await supa.from('metas').upsert({
+    mes_referencia: mes, meta_total: total,
+    meta_hospedagem: Number(document.getElementById('meta-hosp').value)||null,
+    meta_internato: Number(document.getElementById('meta-intern').value)||null,
+    meta_creche: Number(document.getElementById('meta-creche').value)||null,
+    meta_banho_tosa: Number(document.getElementById('meta-banho').value)||null,
+    meta_passeio: Number(document.getElementById('meta-passeio').value)||null,
+    meta_acessorios: Number(document.getElementById('meta-acess').value)||null,
+  }, {onConflict:'mes_referencia'});
+  if(error) { showToast('Erro ao salvar meta','error'); return; }
+  fecharModal('modal-meta');
+  showToast('Meta salva!','success');
+  carregarFinanceiro();
+  carregarDashboard();
+}
+
+// ====== RELATÓRIOS ======
+async function carregarRelatorios() {
+  const mesAtual = new Date().toISOString().slice(0,7);
+  const { data: movs } = await supa.from('movimentacoes').select('*').gte('data_movimentacao', mesAtual+'-01');
+  const movData = movs||[];
+  const receita = movData.filter(m=>m.tipo==='entrada').reduce((a,b)=>a+(Number(b.valor)||0),0);
+  const despesa = movData.filter(m=>m.tipo==='saida').reduce((a,b)=>a+(Number(b.valor)||0),0);
+  const { data: tuts } = await supa.from('tutores').select('id');
+  const { data: resv } = await supa.from('reservas').select('id').eq('status_reserva','concluida');
+  document.getElementById('relatorios-content').innerHTML = `
+    <div class="metrics">
+      <div class="met"><div class="met-lbl">Tutores cadastrados</div><div class="met-val c-orange">${tuts?.length||0}</div></div>
+      <div class="met"><div class="met-lbl">Reservas concluídas</div><div class="met-val c-sage">${resv?.length||0}</div></div>
+      <div class="met"><div class="met-lbl">Receita do mês</div><div class="met-val c-gold">${fmtMoeda(receita)}</div></div>
+      <div class="met"><div class="met-lbl">Lucro do mês</div><div class="met-val c-green">${fmtMoeda(receita-despesa)}</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Relatórios disponíveis em breve</div>
+      <div class="alert alert-sage"><i class="ti ti-info-circle"></i><span>Conforme você for registrando reservas, movimentações e leads, os relatórios serão gerados automaticamente aqui com gráficos e exportação para PDF.</span></div>
+    </div>
+  `;
+}
+
+// ====== CONVITE ======
+async function convidarUsuario() {
+  const email = document.getElementById('cfg-invite-email').value;
+  if(!email) { showToast('Informe o e-mail','error'); return; }
+  const { error } = await supa.auth.admin?.inviteUserByEmail(email);
+  showToast('Para convidar usuários, use o painel do Supabase: Authentication > Users > Invite user');
+}
+
+// ====== FECHAR MODAL CLICANDO FORA ======
+document.querySelectorAll('.overlay').forEach(o => {
+  o.addEventListener('click', e => { if(e.target===o) o.classList.remove('on'); });
+});
+
+// ====== INIT ======
+verificarSessao();
+</script>
+</body>
+</html>
