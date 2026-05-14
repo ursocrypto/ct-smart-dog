@@ -265,6 +265,7 @@ html,body{height:100%;font-family:'Bricolage Grotesque',system-ui;background:var
       <div class="sb-item" onclick="nav('financeiro',this)"><i class="ti ti-chart-bar"></i><span>Financeiro</span></div>
       <div class="sb-item" onclick="nav('caixa',this)"><i class="ti ti-cash"></i><span>Caixa do Dia</span></div>
       <div class="sb-item" onclick="nav('relatorios',this)"><i class="ti ti-report"></i><span>Relatórios</span></div>
+      <div class="sb-item" onclick="nav('socios',this)"><i class="ti ti-users-group"></i><span>Societário</span></div>
       <span class="sb-section">Sistema</span>
       <div class="sb-item" onclick="nav('config',this)"><i class="ti ti-settings"></i><span>Configurações</span></div>
       <div class="sb-foot">CT Smart Dog v1.0</div>
@@ -420,7 +421,15 @@ html,body{height:100%;font-family:'Bricolage Grotesque',system-ui;background:var
       <div class="page" id="page-parcerias">
         <div class="page-head">
           <div class="page-title">🤝 Parcerias</div>
-          <button class="btn btn-primary btn-sm" onclick="abrirModal('modal-parceiro')"><i class="ti ti-plus"></i>Novo parceiro</button>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm" onclick="abrirModal('modal-prof-banho')"><i class="ti ti-bath"></i>Nova profissional Banho</button>
+            <button class="btn btn-primary btn-sm" onclick="abrirModal('modal-parceiro')"><i class="ti ti-plus"></i>Novo parceiro</button>
+          </div>
+        </div>
+        <!-- REPASSES PENDENTES BANHO & TOSA -->
+        <div class="card" style="background:var(--blue-light);border-color:#a0b5d0;margin-bottom:12px">
+          <div class="card-title" style="color:var(--blue)"><i class="ti ti-clock" style="margin-right:5px"></i>Repasses pendentes — Banho & Tosa</div>
+          <div id="lista-repasses-pendentes"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
         </div>
         <div id="lista-parceiros"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
       </div>
@@ -470,6 +479,15 @@ html,body{height:100%;font-family:'Bricolage Grotesque',system-ui;background:var
       <div class="page" id="page-relatorios">
         <div class="page-head"><div class="page-title">📈 Relatórios</div></div>
         <div id="relatorios-content"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
+      </div>
+
+      <!-- SOCIETÁRIO -->
+      <div class="page" id="page-socios">
+        <div class="page-head">
+          <div class="page-title">👥 Societário</div>
+          <button class="btn btn-sm" onclick="abrirModal('modal-distribuir')"><i class="ti ti-calculator"></i>Distribuir lucro do mês</button>
+        </div>
+        <div id="socios-content"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
       </div>
 
       <!-- CONFIG -->
@@ -535,7 +553,7 @@ html,body{height:100%;font-family:'Bricolage Grotesque',system-ui;background:var
     </div>
     <div class="row2">
       <div class="field"><label>Serviço</label>
-        <select id="res-servico">
+        <select id="res-servico" onchange="onServicoChange()">
           <option value="hospedagem">Hospedagem</option>
           <option value="internato">Internato</option>
           <option value="creche">Creche Diária</option>
@@ -578,6 +596,13 @@ html,body{height:100%;font-family:'Bricolage Grotesque',system-ui;background:var
         </select>
       </div>
       <div class="field"><label>Vaga nº</label><input type="number" id="res-vaga" placeholder="Ex: 5"/></div>
+    </div>
+    <!-- CAMPO BANHO & TOSA — aparece só quando serviço = banho_tosa -->
+    <div id="campo-banhista" style="display:none">
+      <div style="background:var(--blue-light);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:11px;color:var(--blue)">
+        <i class="ti ti-info-circle"></i> <b>Banho & Tosa:</b> o repasse de 60% para a profissional será calculado automaticamente.
+      </div>
+      <div class="field"><label>Profissional responsável</label><select id="res-banhista"><option value="">Selecionar profissional...</option></select></div>
     </div>
     <div class="field"><label>Observações (medicação, alimentação especial...)</label><textarea id="res-obs" rows="2" placeholder="Ex: Tomar remédio às 12h..."></textarea></div>
     <div class="modal-foot">
@@ -668,6 +693,9 @@ html,body{height:100%;font-family:'Bricolage Grotesque',system-ui;background:var
           <option value="repasse_parceiro">Repasse Parceiro</option>
           <option value="repasse_banhista">Repasse Banhista</option>
           <option value="manutencao">Manutenção</option>
+          <option value="distribuicao_victor">Distribuição — Victor</option>
+          <option value="distribuicao_alan">Distribuição — Alan</option>
+          <option value="reserva_societaria">Reserva Societária</option>
           <option value="outros">Outros</option>
         </select>
       </div>
@@ -873,6 +901,54 @@ html,body{height:100%;font-family:'Bricolage Grotesque',system-ui;background:var
   </div>
 </div>
 
+<!-- MODAL DISTRIBUIR LUCRO -->
+<div class="overlay" id="modal-distribuir">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-calculator" style="color:var(--orange)"></i>Distribuir Lucro do Mês</div>
+    <div class="field"><label>Mês de referência</label><input type="month" id="dist-mes"/></div>
+    <div class="field"><label>Lucro líquido do mês (R$)</label><input type="number" id="dist-lucro" placeholder="Ex: 7560.00" step="0.01" oninput="calcularDistribuicao()"/></div>
+    <div id="dist-preview" style="margin-top:12px;display:none">
+      <div style="background:#f7f3ee;border-radius:10px;padding:14px">
+        <div style="font-size:12px;font-weight:600;color:var(--brown);margin-bottom:10px">Prévia da distribuição</div>
+        <div id="dist-calc"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="fecharModal('modal-distribuir')">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarDistribuicao()"><i class="ti ti-check"></i>Confirmar distribuição</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PROFISSIONAL BANHO -->
+<div class="overlay" id="modal-prof-banho">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-bath" style="color:var(--blue)"></i>Cadastrar Profissional de Banho & Tosa</div>
+    <div class="row2">
+      <div class="field"><label>Nome completo</label><input id="pb-nome" placeholder="Nome da profissional"/></div>
+      <div class="field"><label>Telefone / WhatsApp</label><input id="pb-tel" placeholder="(21) 99999-0000"/></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Chave PIX</label><input id="pb-pix" placeholder="CPF, e-mail ou telefone"/></div>
+      <div class="field"><label>Tipo</label>
+        <select id="pb-tipo">
+          <option value="completo">Banho & Tosa completo</option>
+          <option value="tosador">Tosador(a)</option>
+          <option value="banhista">Banhista</option>
+        </select>
+      </div>
+    </div>
+    <div class="field"><label>% de repasse para a profissional</label>
+      <input type="number" id="pb-pct" value="60" min="0" max="100" placeholder="Ex: 60"/>
+      <div style="font-size:10px;color:var(--brown-mid);margin-top:4px">Ex: 60% para a profissional = 40% para o CT Smart Dog</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="fecharModal('modal-prof-banho')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarProfBanho()"><i class="ti ti-check"></i>Cadastrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -961,7 +1037,7 @@ function nav(pg, el) {
   if(pg==='parcerias') carregarParceiros();
   if(pg==='financeiro') carregarFinanceiro();
   if(pg==='caixa') carregarCaixa();
-  if(pg==='relatorios') carregarRelatorios();
+  if(pg==='socios') carregarSocios();
   if(window.innerWidth<=768) document.getElementById('sidebar').classList.remove('mobile-open');
 }
 
@@ -1089,26 +1165,113 @@ async function salvarReserva() {
   const tutId = document.getElementById('res-tutor').value;
   const petId = document.getElementById('res-pet').value;
   const entrada = document.getElementById('res-entrada').value;
+  const servico = document.getElementById('res-servico').value;
+  const valor = Number(document.getElementById('res-valor').value)||0;
+  const banhistaId = document.getElementById('res-banhista').value||null;
   if(!tutId||!petId||!entrada) { showToast('Preencha tutor, pet e data de entrada','error'); return; }
-  const { error } = await supa.from('reservas').insert({
+  if(servico==='banho_tosa'&&!banhistaId) { showToast('Selecione a profissional de Banho & Tosa','error'); return; }
+
+  // Salvar reserva
+  const { data: resData, error } = await supa.from('reservas').insert({
     tutor_id: tutId, pet_id: petId,
-    servico_tipo: document.getElementById('res-servico').value,
+    servico_tipo: servico,
     data_entrada: entrada,
     data_saida: document.getElementById('res-saida').value||null,
-    valor_total: Number(document.getElementById('res-valor').value)||0,
+    valor_total: valor,
     forma_pagamento: document.getElementById('res-pgto').value,
     status_pagamento: document.getElementById('res-status-pgto').value,
     status_reserva: 'confirmada',
     origem: document.getElementById('res-origem').value,
     numero_vaga: Number(document.getElementById('res-vaga').value)||null,
+    profissional_banho_id: banhistaId||null,
     observacoes: document.getElementById('res-obs').value||null
-  });
+  }).select().single();
   if(error) { showToast('Erro ao salvar reserva','error'); return; }
-  fecharModal('modal-reserva');
-  showToast('Reserva criada com sucesso!','success');
+
+  // Se for Banho & Tosa, calcular repasse automático 60%
+  if(servico==='banho_tosa' && banhistaId && valor > 0) {
+    // Buscar % do profissional (padrão 60 se não encontrado)
+    const { data: prof } = await supa.from('profissionais_banho').select('percentual_repasse,nome').eq('id', banhistaId).single();
+    const pct = prof?.percentual_repasse || 60;
+    const valorRepasse = Number((valor * pct / 100).toFixed(2));
+    const mesRef = entrada.slice(0,7);
+
+    // Registrar repasse pendente
+    await supa.from('repasses').insert({
+      tipo: 'banhista',
+      profissional_banho_id: banhistaId,
+      mes_referencia: mesRef,
+      valor_receita_gerada: valor,
+      percentual: pct,
+      valor_repasse: valorRepasse,
+      status: 'pendente',
+      observacoes: `Repasse automático — Banho & Tosa em ${fmtData(entrada)}`
+    });
+
+    // Registrar alerta no caixa como saída pendente
+    await supa.from('movimentacoes').insert({
+      tipo: 'saida',
+      categoria: 'repasse_banhista',
+      descricao: `⏳ Repasse pendente — ${prof?.nome||'Profissional'} (${pct}% de ${fmtMoeda(valor)})`,
+      valor: valorRepasse,
+      forma_pagamento: 'pix',
+      data_movimentacao: entrada,
+    });
+
+    fecharModal('modal-reserva');
+    showToast(`✅ Reserva criada! Repasse de ${fmtMoeda(valorRepasse)} (${pct}%) gerado automaticamente para ${prof?.nome||'a profissional'}.`, 'success');
+  } else {
+    fecharModal('modal-reserva');
+    showToast('Reserva criada com sucesso!', 'success');
+  }
+
   carregarDashboard();
   carregarAgenda();
   carregarVagas();
+}
+
+// Mostrar/ocultar campo banhista conforme serviço selecionado
+async function onServicoChange() {
+  const servico = document.getElementById('res-servico').value;
+  const campo = document.getElementById('campo-banhista');
+  if(servico === 'banho_tosa') {
+    campo.style.display = 'block';
+    await carregarBanhistasSelect();
+  } else {
+    campo.style.display = 'none';
+  }
+}
+
+async function carregarBanhistasSelect() {
+  const { data } = await supa.from('profissionais_banho').select('*').eq('ativo', true);
+  const sel = document.getElementById('res-banhista');
+  if(!data?.length) {
+    sel.innerHTML = '<option value="">Nenhuma profissional cadastrada ainda</option>';
+    return;
+  }
+  sel.innerHTML = '<option value="">Selecionar profissional...</option>' +
+    data.map(p=>`<option value="${p.id}">${p.nome} (${p.percentual_repasse}%)</option>`).join('');
+}
+
+// Painel de repasses pendentes de Banho & Tosa
+async function carregarRepassesPendentes() {
+  const { data } = await supa.from('repasses')
+    .select('*,profissionais_banho(nome,chave_pix)')
+    .eq('tipo','banhista').eq('status','pendente')
+    .order('criado_em',{ascending:false});
+  return data||[];
+}
+
+async function pagarRepasse(id, valor, nome) {
+  if(!confirm(`Confirmar pagamento de ${fmtMoeda(valor)} para ${nome}?`)) return;
+  const { error } = await supa.from('repasses').update({
+    status: 'pago',
+    data_pagamento: new Date().toISOString().split('T')[0],
+    forma_pagamento: 'pix'
+  }).eq('id', id);
+  if(error) { showToast('Erro ao registrar pagamento','error'); return; }
+  showToast(`✅ Repasse de ${fmtMoeda(valor)} para ${nome} registrado como pago!`, 'success');
+  carregarParceirosBanho();
 }
 
 // ====== TUTORES ======
@@ -1335,6 +1498,7 @@ async function salvarLead() {
 
 // ====== PARCERIAS ======
 async function carregarParceiros() {
+  carregarParceirosBanho();
   const { data } = await supa.from('parceiros').select('*').eq('ativo',true).order('nome');
   if(!data?.length) { document.getElementById('lista-parceiros').innerHTML='<div class="card"><div style="text-align:center;padding:20px;color:var(--brown-mid)">Nenhum parceiro cadastrado ainda</div></div>'; return; }
   document.getElementById('lista-parceiros').innerHTML = data.map(p=>`
@@ -1496,6 +1660,216 @@ async function salvarMeta() {
   carregarDashboard();
 }
 
+// ====== SOCIETÁRIO ======
+const SOCIOS_CONFIG = {
+  investimento_total: 28000,
+  meta_retorno: 56000, // dobro do investimento
+  reserva_pct: 10,
+  socios: [
+    { nome: 'Victor', papel: 'Investidor financeiro', pct_atual: 60, pct_pos_retorno: 50, cor: 'var(--orange)', cor_light: 'var(--orange-light)' },
+    { nome: 'Alan',   papel: 'Capital técnico / Adestrador', pct_atual: 40, pct_pos_retorno: 50, cor: 'var(--sage)', cor_light: 'var(--sage-light)' }
+  ]
+};
+
+async function carregarSocios() {
+  const el = document.getElementById('socios-content');
+  el.innerHTML = '<div class="loading"><div class="spinner"></div>Carregando...</div>';
+
+  // Buscar todas as distribuições já registradas
+  const { data: distribs } = await supa.from('movimentacoes')
+    .select('*')
+    .in('categoria', ['distribuicao_victor','distribuicao_alan','reserva_societaria'])
+    .order('data_movimentacao', {ascending: true});
+
+  const movs = distribs || [];
+
+  // Total já distribuído por sócio
+  const totalVictor = movs.filter(m=>m.categoria==='distribuicao_victor').reduce((a,b)=>a+(Number(b.valor)||0),0);
+  const totalAlan   = movs.filter(m=>m.categoria==='distribuicao_alan').reduce((a,b)=>a+(Number(b.valor)||0),0);
+  const totalReserva = movs.filter(m=>m.categoria==='reserva_societaria').reduce((a,b)=>a+(Number(b.valor)||0),0);
+  const totalDistribuido = totalVictor + totalAlan;
+
+  // Progresso do retorno do investimento
+  const retornoVictor = totalVictor;
+  const pctRetorno = Math.min(Math.round(retornoVictor / SOCIOS_CONFIG.meta_retorno * 100), 100);
+  const faltaRetorno = Math.max(SOCIOS_CONFIG.meta_retorno - retornoVictor, 0);
+  const retornoAtingido = retornoVictor >= SOCIOS_CONFIG.meta_retorno;
+  const divisaoAtual = retornoAtingido ? '50/50' : '60/40';
+
+  // Buscar lucro do mês atual
+  const mesAtual = new Date().toISOString().slice(0,7);
+  const { data: movMes } = await supa.from('movimentacoes').select('tipo,valor').gte('data_movimentacao', mesAtual+'-01');
+  const receitaMes = (movMes||[]).filter(m=>m.tipo==='entrada').reduce((a,b)=>a+(Number(b.valor)||0),0);
+  const despesaMes = (movMes||[]).filter(m=>m.tipo==='saida').reduce((a,b)=>a+(Number(b.valor)||0),0);
+  const lucroMes = Math.max(receitaMes - despesaMes, 0);
+  const reservaMes = lucroMes * 0.10;
+  const lucroParaDividir = lucroMes - reservaMes;
+  const victorMes = lucroParaDividir * (retornoAtingido ? 0.50 : 0.60);
+  const alanMes   = lucroParaDividir * (retornoAtingido ? 0.50 : 0.40);
+
+  el.innerHTML = `
+    <!-- STATUS DO RETORNO -->
+    <div class="card" style="border:2px solid ${retornoAtingido?'var(--green)':'var(--orange)'}; margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:var(--brown)">
+            ${retornoAtingido ? '🎉 Investimento recuperado!' : '📈 Retorno do investimento — Victor'}
+          </div>
+          <div style="font-size:11px;color:var(--brown-mid);margin-top:2px">
+            Investimento: ${fmtMoeda(SOCIOS_CONFIG.investimento_total)} · Meta: ${fmtMoeda(SOCIOS_CONFIG.meta_retorno)} (dobro)
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:24px;font-weight:700;color:${retornoAtingido?'var(--green)':'var(--orange)'}">${pctRetorno}%</div>
+          <div style="font-size:10px;color:var(--brown-mid)">recuperado</div>
+        </div>
+      </div>
+      <div class="meta-bar-track">
+        <div class="meta-bar-fill" style="width:${pctRetorno}%;background:${retornoAtingido?'var(--green)':'linear-gradient(90deg,var(--gold),var(--orange))'}"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--brown-mid);margin-top:5px">
+        <span>${fmtMoeda(retornoVictor)} recuperado</span>
+        ${retornoAtingido
+          ? `<span style="color:var(--green);font-weight:600">✅ Divisão mudou para 50/50!</span>`
+          : `<span style="color:var(--orange)">Faltam ${fmtMoeda(faltaRetorno)} para mudar para 50/50</span>`}
+      </div>
+      <div style="margin-top:10px;padding:8px 12px;background:${retornoAtingido?'var(--green-light)':'var(--orange-light)'};border-radius:8px;font-size:12px;color:${retornoAtingido?'var(--green)':'var(--orange-dark)'}">
+        <b>Divisão atual: ${divisaoAtual}</b> ${retornoAtingido?'— meta atingida, agora é 50/50':'— muda para 50/50 quando Victor recuperar R$56.000'}
+      </div>
+    </div>
+
+    <!-- CARDS DOS SÓCIOS -->
+    <div class="g2" style="margin-bottom:12px">
+      ${SOCIOS_CONFIG.socios.map(s => {
+        const total = s.nome==='Victor' ? totalVictor : totalAlan;
+        const mes   = s.nome==='Victor' ? victorMes : alanMes;
+        const pct   = retornoAtingido ? s.pct_pos_retorno : s.pct_atual;
+        return `
+        <div class="card" style="border-left:4px solid ${s.cor}">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+            <div class="av" style="background:${s.cor_light};color:${s.cor};width:42px;height:42px;font-size:14px">${s.nome[0]}</div>
+            <div>
+              <div style="font-size:15px;font-weight:700;color:var(--brown)">${s.nome}</div>
+              <div style="font-size:11px;color:var(--brown-mid)">${s.papel}</div>
+            </div>
+            <span style="margin-left:auto;font-size:22px;font-weight:700;color:${s.cor}">${pct}%</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+            <div style="background:#f7f3ee;border-radius:8px;padding:10px;text-align:center">
+              <div style="font-size:16px;font-weight:700;color:${s.cor}">${fmtMoeda(total)}</div>
+              <div style="font-size:10px;color:var(--brown-mid)">Total recebido</div>
+            </div>
+            <div style="background:#f7f3ee;border-radius:8px;padding:10px;text-align:center">
+              <div style="font-size:16px;font-weight:700;color:${s.cor}">${fmtMoeda(mes)}</div>
+              <div style="font-size:10px;color:var(--brown-mid)">Estimativa mês atual</div>
+            </div>
+          </div>
+          ${s.nome==='Victor' && !retornoAtingido ? `
+            <div style="font-size:11px;color:var(--brown-mid);padding:6px 10px;background:var(--orange-light);border-radius:7px">
+              💰 Retorno acumulado: ${fmtMoeda(totalVictor)} de ${fmtMoeda(SOCIOS_CONFIG.meta_retorno)}
+            </div>` : ''}
+        </div>`;
+      }).join('')}
+    </div>
+
+    <!-- RESERVA E RESUMO -->
+    <div class="g2" style="margin-bottom:12px">
+      <div class="card">
+        <div class="card-title">🏦 Fundo de Reserva (10%)</div>
+        <div style="text-align:center;padding:10px 0">
+          <div style="font-size:28px;font-weight:700;color:var(--purple)">${fmtMoeda(totalReserva)}</div>
+          <div style="font-size:11px;color:var(--brown-mid);margin-top:4px">acumulado no fundo</div>
+        </div>
+        <div style="background:var(--purple-light);border-radius:8px;padding:8px 12px;font-size:11px;color:var(--purple)">
+          10% de cada distribuição vai para reserva antes de dividir entre os sócios
+        </div>
+        <div style="margin-top:8px;font-size:12px;color:var(--brown-mid)">
+          Estimativa mês atual: <b style="color:var(--purple)">${fmtMoeda(reservaMes)}</b>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 Resumo do mês atual</div>
+        <div class="sum-row c-green"><span>Lucro líquido estimado</span><span>${fmtMoeda(lucroMes)}</span></div>
+        <div class="sum-row c-purple"><span>(-) Reserva 10%</span><span>${fmtMoeda(reservaMes)}</span></div>
+        <div class="sum-row"><span>Valor a distribuir</span><span style="font-weight:600">${fmtMoeda(lucroParaDividir)}</span></div>
+        <div class="sum-row" style="color:var(--orange)"><span>Victor (${retornoAtingido?50:60}%)</span><span>${fmtMoeda(victorMes)}</span></div>
+        <div class="sum-row" style="color:var(--sage)"><span>Alan (${retornoAtingido?50:40}%)</span><span>${fmtMoeda(alanMes)}</span></div>
+      </div>
+    </div>
+
+    <!-- HISTÓRICO -->
+    <div class="card">
+      <div class="card-title">Histórico de distribuições</div>
+      ${movs.filter(m=>m.categoria!=='reserva_societaria').length === 0
+        ? '<div style="text-align:center;padding:20px;color:var(--brown-mid);font-size:12px">Nenhuma distribuição registrada ainda.<br>Use o botão "Distribuir lucro do mês" para registrar.</div>'
+        : `<div class="tbl-wrap"><table class="tbl">
+            <thead><tr><th>Mês</th><th>Sócio</th><th>Valor</th><th>Data</th></tr></thead>
+            <tbody>
+              ${movs.filter(m=>m.categoria!=='reserva_societaria').map(m=>`
+                <tr>
+                  <td>${m.data_movimentacao?.slice(0,7)}</td>
+                  <td><span class="bdg ${m.categoria==='distribuicao_victor'?'bdg-orange':'bdg-sage'}">${m.categoria==='distribuicao_victor'?'Victor':'Alan'}</span></td>
+                  <td style="font-weight:600">${fmtMoeda(m.valor)}</td>
+                  <td style="color:var(--brown-mid)">${fmtData(m.data_movimentacao)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table></div>`
+      }
+    </div>
+  `;
+}
+
+function calcularDistribuicao() {
+  const lucro = Number(document.getElementById('dist-lucro').value)||0;
+  if(!lucro) { document.getElementById('dist-preview').style.display='none'; return; }
+
+  // Verificar se retorno já foi atingido
+  const preview = document.getElementById('dist-preview');
+  const calc = document.getElementById('dist-calc');
+  preview.style.display = 'block';
+
+  const reserva = lucro * 0.10;
+  const paraDistribuir = lucro - reserva;
+  // Calcular % dinâmico (simplificado — usa 60/40 por padrão, ajusta se necessário)
+  const victorPct = 60; const alanPct = 40;
+  const victorVal = paraDistribuir * victorPct / 100;
+  const alanVal   = paraDistribuir * alanPct / 100;
+
+  calc.innerHTML = `
+    <div class="sum-row c-green"><span>Lucro informado</span><span>${fmtMoeda(lucro)}</span></div>
+    <div class="sum-row c-purple"><span>(-) Reserva 10%</span><span>${fmtMoeda(reserva)}</span></div>
+    <div class="sum-row"><span><b>Valor a distribuir</b></span><span><b>${fmtMoeda(paraDistribuir)}</b></span></div>
+    <div class="sum-row" style="color:var(--orange)"><span>Victor (${victorPct}%)</span><span>${fmtMoeda(victorVal)}</span></div>
+    <div class="sum-row" style="color:var(--sage)"><span>Alan (${alanPct}%)</span><span>${fmtMoeda(alanVal)}</span></div>
+  `;
+}
+
+async function confirmarDistribuicao() {
+  const mes = document.getElementById('dist-mes').value;
+  const lucro = Number(document.getElementById('dist-lucro').value)||0;
+  if(!mes || !lucro) { showToast('Preencha o mês e o lucro','error'); return; }
+
+  const reserva = lucro * 0.10;
+  const paraDistribuir = lucro - reserva;
+  const victorVal = paraDistribuir * 0.60;
+  const alanVal   = paraDistribuir * 0.40;
+  const dataRef   = mes + '-01';
+
+  // Registrar as 3 movimentações
+  const inserts = [
+    { tipo:'saida', categoria:'distribuicao_victor', descricao:`Distribuição Victor — ${mes}`, valor: victorVal, forma_pagamento:'pix', data_movimentacao: dataRef },
+    { tipo:'saida', categoria:'distribuicao_alan',   descricao:`Distribuição Alan — ${mes}`,   valor: alanVal,   forma_pagamento:'pix', data_movimentacao: dataRef },
+    { tipo:'saida', categoria:'reserva_societaria',  descricao:`Reserva societária 10% — ${mes}`, valor: reserva, forma_pagamento:'ted', data_movimentacao: dataRef },
+  ];
+  const { error } = await supa.from('movimentacoes').insert(inserts);
+  if(error) { showToast('Erro ao registrar distribuição','error'); return; }
+
+  fecharModal('modal-distribuir');
+  showToast(`✅ Distribuição registrada! Victor: ${fmtMoeda(victorVal)} · Alan: ${fmtMoeda(alanVal)} · Reserva: ${fmtMoeda(reserva)}`, 'success');
+  carregarSocios();
+}
+
 // ====== RELATÓRIOS ======
 async function carregarRelatorios() {
   const mesAtual = new Date().toISOString().slice(0,7);
@@ -1517,6 +1891,57 @@ async function carregarRelatorios() {
       <div class="alert alert-sage"><i class="ti ti-info-circle"></i><span>Conforme você for registrando reservas, movimentações e leads, os relatórios serão gerados automaticamente aqui com gráficos e exportação para PDF.</span></div>
     </div>
   `;
+}
+
+// ====== PROFISSIONAL BANHO ======
+async function salvarProfBanho() {
+  const nome = document.getElementById('pb-nome').value;
+  if(!nome) { showToast('Informe o nome da profissional','error'); return; }
+  const { error } = await supa.from('profissionais_banho').insert({
+    nome,
+    telefone: document.getElementById('pb-tel').value,
+    chave_pix: document.getElementById('pb-pix').value,
+    tipo: document.getElementById('pb-tipo').value,
+    percentual_repasse: Number(document.getElementById('pb-pct').value)||60
+  });
+  if(error) { showToast('Erro ao cadastrar','error'); return; }
+  fecharModal('modal-prof-banho');
+  showToast('Profissional cadastrada com sucesso!','success');
+  carregarParceirosBanho();
+}
+
+async function carregarParceirosBanho() {
+  // Repasses pendentes
+  const repasses = await carregarRepassesPendentes();
+  const elR = document.getElementById('lista-repasses-pendentes');
+  if(!elR) return;
+  if(!repasses.length) {
+    elR.innerHTML = '<div style="font-size:12px;color:var(--blue);padding:4px 0">✅ Nenhum repasse pendente no momento</div>';
+  } else {
+    const total = repasses.reduce((a,b)=>a+(Number(b.valor_repasse)||0),0);
+    elR.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-size:12px;color:var(--blue)"><b>${repasses.length}</b> repasse(s) pendente(s)</span>
+        <span style="font-size:16px;font-weight:700;color:var(--blue)">Total: ${fmtMoeda(total)}</span>
+      </div>
+      ${repasses.map(r=>`
+        <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:#fff;border-radius:8px;margin-bottom:6px;border:1px solid #a0b5d0">
+          <div class="av" style="background:var(--blue-light);color:var(--blue)">${iniciais(r.profissionais_banho?.nome||'?')}</div>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:600;color:var(--brown)">${r.profissionais_banho?.nome||'—'}</div>
+            <div style="font-size:10px;color:var(--brown-mid)">${r.mes_referencia} · ${r.percentual}% de ${fmtMoeda(r.valor_receita_gerada)} · PIX: ${r.profissionais_banho?.chave_pix||'não cadastrado'}</div>
+            <div style="font-size:10px;color:var(--brown-mid)">${r.observacoes||''}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:16px;font-weight:700;color:var(--blue)">${fmtMoeda(r.valor_repasse)}</div>
+            <button class="btn btn-green btn-sm" style="margin-top:4px" onclick="pagarRepasse('${r.id}',${r.valor_repasse},'${r.profissionais_banho?.nome||'profissional'}')">
+              <i class="ti ti-check"></i>Marcar pago
+            </button>
+          </div>
+        </div>
+      `).join('')}
+    `;
+  }
 }
 
 // ====== CONVITE ======
