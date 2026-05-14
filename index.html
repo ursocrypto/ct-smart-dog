@@ -1911,146 +1911,130 @@ async function confirmarDistribuicao() {
 // ====== RELATÓRIOS ======
 async function carregarRelatorios() {
   const el = document.getElementById('relatorios-content');
+  el.innerHTML = '<div class="loading"><div class="spinner"></div>Carregando relatórios...</div>';
   try {
-    // Buscar todos os dados necessários em paralelo
-    const [movsRes, tutsRes, resvRes, leadsRes] = await Promise.all([
-      supa.from('movimentacoes').select('*').order('data_movimentacao', {ascending:true}),
-      supa.from('tutores').select('id,criado_em,como_conheceu'),
-      supa.from('reservas').select('id,servico_tipo,valor_total,data_entrada,status_reserva,origem'),
-      supa.from('leads').select('id,etapa,criado_em')
-    ]);
+    // Buscar dados um por um para identificar qual falha
+    const movsRes  = await supa.from('movimentacoes').select('tipo,valor,categoria,data_movimentacao').order('data_movimentacao',{ascending:true});
+    if(movsRes.error) throw new Error('Movimentações: ' + movsRes.error.message);
 
-    const movs   = movsRes.data  || [];
-    const tuts   = tutsRes.data  || [];
-    const resvs  = resvRes.data  || [];
-    const leads  = leadsRes.data || [];
+    const tutsRes  = await supa.from('tutores').select('id,criado_em,como_conheceu');
+    if(tutsRes.error) throw new Error('Tutores: ' + tutsRes.error.message);
 
-    // Agrupar movimentações por mês
+    const resvRes  = await supa.from('reservas').select('id,servico_tipo,valor_total,data_entrada,status_reserva,origem');
+    if(resvRes.error) throw new Error('Reservas: ' + resvRes.error.message);
+
+    const leadsRes = await supa.from('leads').select('id,etapa,criado_em');
+    if(leadsRes.error) throw new Error('Leads: ' + leadsRes.error.message);
+
+    const movs  = movsRes.data  || [];
+    const tuts  = tutsRes.data  || [];
+    const resvs = resvRes.data  || [];
+    const leads = leadsRes.data || [];
+
+    // Agrupar por mês
     const mesesMap = {};
     movs.forEach(m => {
       const mes = (m.data_movimentacao||'').slice(0,7);
       if(!mes) return;
-      if(!mesesMap[mes]) mesesMap[mes] = {receita:0, despesa:0, repasses:0, trafego:0, distribuicao:0, reserva:0};
+      if(!mesesMap[mes]) mesesMap[mes] = {receita:0,despesa:0,repasses:0,trafego:0,distribuicao:0,reserva:0};
       const v = Number(m.valor)||0;
-      if(m.tipo==='entrada') mesesMap[mes].receita += v;
-      else {
+      if(m.tipo==='entrada') {
+        mesesMap[mes].receita += v;
+      } else {
         mesesMap[mes].despesa += v;
-        if(m.categoria==='repasse_parceiro'||m.categoria==='repasse_banhista') mesesMap[mes].repasses += v;
-        if(m.categoria==='trafego_pago') mesesMap[mes].trafego += v;
-        if(m.categoria==='distribuicao_victor'||m.categoria==='distribuicao_alan') mesesMap[mes].distribuicao += v;
-        if(m.categoria==='reserva_societaria') mesesMap[mes].reserva += v;
+        const cat = m.categoria||'';
+        if(cat==='repasse_parceiro'||cat==='repasse_banhista') mesesMap[mes].repasses += v;
+        if(cat==='trafego_pago') mesesMap[mes].trafego += v;
+        if(cat==='distribuicao_victor'||cat==='distribuicao_alan') mesesMap[mes].distribuicao += v;
+        if(cat==='reserva_societaria') mesesMap[mes].reserva += v;
       }
     });
 
-    const meses = Object.keys(mesesMap).sort();
+    const meses    = Object.keys(mesesMap).sort();
     const mesAtual = new Date().toISOString().slice(0,7);
-
-    // Métricas gerais
     const receitaTotal = movs.filter(m=>m.tipo==='entrada').reduce((a,b)=>a+(Number(b.valor)||0),0);
     const despesaTotal = movs.filter(m=>m.tipo==='saida').reduce((a,b)=>a+(Number(b.valor)||0),0);
     const lucroTotal   = receitaTotal - despesaTotal;
-    const receitaMes   = mesesMap[mesAtual]?.receita || 0;
-    const despesaMes   = mesesMap[mesAtual]?.despesa || 0;
 
-    // Receita por serviço (geral)
+    // Receita por serviço
     const porServico = {};
-    resvs.forEach(r => {
-      const s = r.servico_tipo||'outros';
-      porServico[s] = (porServico[s]||0) + (Number(r.valor_total)||0);
-    });
-    const maxSvc = Math.max(...Object.values(porServico), 1);
+    resvs.forEach(r => { const s=r.servico_tipo||'outros'; porServico[s]=(porServico[s]||0)+(Number(r.valor_total)||0); });
+    const maxSvc = Math.max(...Object.values(porServico),1);
 
-    // Origem dos clientes
+    // Origem clientes
     const origens = {};
     tuts.forEach(t => { const o=t.como_conheceu||'organico'; origens[o]=(origens[o]||0)+1; });
     const totalTuts = tuts.length||1;
 
-    // Leads convertidos vs perdidos
+    // CRM
     const convertidos = leads.filter(l=>l.etapa==='convertido').length;
     const perdidos    = leads.filter(l=>l.etapa==='perdido').length;
     const totalLeads  = leads.length;
     const taxaConv    = totalLeads ? Math.round(convertidos/totalLeads*100) : 0;
 
-    // Gráfico de barras SVG — receita mensal
-    const maxReceita = Math.max(...meses.map(m=>mesesMap[m].receita), 1);
-    const barW = meses.length ? Math.min(Math.floor(560/meses.length)-6, 60) : 40;
-    const svgBars = meses.map((m, i) => {
+    // SVG gráfico
+    const maxReceita = Math.max(...meses.map(m=>mesesMap[m].receita),1);
+    const barW = Math.min(Math.floor(560/Math.max(meses.length,1))-6, 60);
+    const svgW = Math.max(meses.length*(barW+6)+20, 400);
+    const svgBars = meses.map((m,i) => {
       const rec = mesesMap[m].receita;
       const luc = Math.max(mesesMap[m].receita - mesesMap[m].despesa, 0);
-      const hRec = Math.round((rec/maxReceita)*120);
-      const hLuc = Math.round((luc/maxReceita)*120);
-      const x = i*(barW+6)+10;
-      const label = m.slice(5)+'/'+m.slice(2,4);
+      const hR  = Math.round((rec/maxReceita)*110);
+      const hL  = Math.round((luc/maxReceita)*110);
+      const x   = i*(barW+6)+10;
+      const lbl = m.slice(5)+'/'+m.slice(2,4);
       return `
-        <rect x="${x}" y="${130-hRec}" width="${barW}" height="${hRec}" fill="#faf0d7" rx="3"/>
-        <rect x="${x}" y="${130-hLuc}" width="${barW}" height="${hLuc}" fill="#F08C4A" rx="3"/>
-        <text x="${x+barW/2}" y="146" text-anchor="middle" font-size="9" fill="#7a5c4a">${label}</text>
-        <text x="${x+barW/2}" y="${125-hRec}" text-anchor="middle" font-size="8" fill="#8a6018">${rec>=1000?(rec/1000).toFixed(1)+'k':rec}</text>
+        <rect x="${x}" y="${120-hR}" width="${barW}" height="${hR}" fill="#faf0d7" rx="3"/>
+        <rect x="${x}" y="${120-hL}" width="${barW}" height="${hL}" fill="#F08C4A" rx="3" opacity="0.9"/>
+        <text x="${x+barW/2}" y="134" text-anchor="middle" font-size="9" fill="#7a5c4a">${lbl}</text>
       `;
     }).join('');
 
-    const nomesMeses = {
-      '01':'Jan','02':'Fev','03':'Mar','04':'Abr','05':'Mai','06':'Jun',
-      '07':'Jul','08':'Ago','09':'Set','10':'Out','11':'Nov','12':'Dez'
-    };
-    function nomeMes(m) { return (nomesMeses[m.slice(5)]||m.slice(5))+'/'+m.slice(2,4); }
+    const nomesMeses = {'01':'Jan','02':'Fev','03':'Mar','04':'Abr','05':'Mai','06':'Jun','07':'Jul','08':'Ago','09':'Set','10':'Out','11':'Nov','12':'Dez'};
+    const nomeMes = m => (nomesMeses[m.slice(5)]||m.slice(5))+'/'+m.slice(2,4);
+    const nomeOrigens = {organico:'Orgânico',trafego_pago:'Tráfego Pago',blogueiro:'Blogueiro',adestrador:'Adestrador',indicacao:'Indicação'};
+    const coresOrigens = {organico:'var(--orange)',trafego_pago:'var(--blue)',blogueiro:'var(--purple)',adestrador:'var(--sage)',indicacao:'var(--gold)'};
 
     el.innerHTML = `
-      <!-- MÉTRICAS GERAIS -->
       <div class="metrics">
-        <div class="met"><div class="met-lbl">Receita total acumulada</div><div class="met-val c-gold">${fmtMoeda(receitaTotal)}</div><div class="met-sub">desde o início</div></div>
-        <div class="met"><div class="met-lbl">Lucro total acumulado</div><div class="met-val c-green">${fmtMoeda(lucroTotal)}</div></div>
-        <div class="met"><div class="met-lbl">Receita mês atual</div><div class="met-val c-orange">${fmtMoeda(receitaMes)}</div></div>
-        <div class="met"><div class="met-lbl">Tutores cadastrados</div><div class="met-val c-sage">${tuts.length}</div></div>
+        <div class="met"><div class="met-lbl">Receita acumulada</div><div class="met-val c-gold">${fmtMoeda(receitaTotal)}</div><div class="met-sub">desde o início</div></div>
+        <div class="met"><div class="met-lbl">Lucro acumulado</div><div class="met-val c-green">${fmtMoeda(lucroTotal)}</div></div>
+        <div class="met"><div class="met-lbl">Receita mês atual</div><div class="met-val c-orange">${fmtMoeda(mesesMap[mesAtual]?.receita||0)}</div></div>
+        <div class="met"><div class="met-lbl">Clientes cadastrados</div><div class="met-val c-sage">${tuts.length}</div></div>
         <div class="met"><div class="met-lbl">Taxa de conversão</div><div class="met-val c-purple">${taxaConv}%</div><div class="met-sub">${convertidos} de ${totalLeads} leads</div></div>
         <div class="met"><div class="met-lbl">Meses de operação</div><div class="met-val c-brown">${meses.length||1}</div></div>
       </div>
 
-      <!-- GRÁFICO EVOLUÇÃO MENSAL -->
       <div class="card">
         <div class="card-title">📈 Evolução mensal — Receita vs Lucro</div>
-        ${meses.length === 0
-          ? '<div class="alert alert-sage"><i class="ti ti-info-circle"></i><span>Nenhuma movimentação registrada ainda. Comece registrando entradas no Caixa do Dia.</span></div>'
+        ${meses.length===0
+          ? '<div class="alert alert-sage"><i class="ti ti-info-circle"></i><span>Nenhuma movimentação registrada ainda. Registre entradas no Caixa do Dia para ver o gráfico.</span></div>'
           : `<div style="overflow-x:auto">
-              <svg width="${Math.max(meses.length*(barW+6)+20, 400)}" height="160" style="display:block">
-                <line x1="0" y1="130" x2="100%" y2="130" stroke="#ede5dc" stroke-width="1"/>
+              <svg width="${svgW}" height="145" style="display:block;margin-bottom:6px">
+                <line x1="0" y1="120" x2="${svgW}" y2="120" stroke="#ede5dc" stroke-width="1"/>
                 ${svgBars}
               </svg>
             </div>
-            <div style="display:flex;gap:16px;margin-top:8px;font-size:11px;color:var(--brown-mid)">
+            <div style="display:flex;gap:16px;font-size:11px;color:var(--brown-mid)">
               <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#faf0d7;border:1px solid #f0c878;border-radius:2px;display:inline-block"></span>Receita</span>
               <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:var(--orange);border-radius:2px;display:inline-block"></span>Lucro</span>
-            </div>`
-        }
+            </div>`}
       </div>
 
-      <!-- TABELA HISTÓRICA -->
       <div class="card">
         <div class="card-title">📅 Histórico mês a mês</div>
-        ${meses.length === 0
-          ? '<div style="text-align:center;padding:20px;color:var(--brown-mid);font-size:12px">Sem dados históricos ainda</div>'
+        ${meses.length===0
+          ? '<div style="text-align:center;padding:20px;color:var(--brown-mid);font-size:12px">Sem histórico ainda — registre movimentações para ver aqui</div>'
           : `<div class="tbl-wrap"><table class="tbl">
-              <thead>
-                <tr>
-                  <th>Mês</th>
-                  <th>Receita</th>
-                  <th>Despesas</th>
-                  <th>Repasses</th>
-                  <th>Tráfego pago</th>
-                  <th>Lucro líquido</th>
-                  <th>Margem</th>
-                  <th>Distribuído</th>
-                  <th>Reserva</th>
-                </tr>
-              </thead>
+              <thead><tr><th>Mês</th><th>Receita</th><th>Despesas</th><th>Repasses</th><th>Tráfego</th><th>Lucro líquido</th><th>Margem</th><th>Distribuído</th><th>Reserva</th></tr></thead>
               <tbody>
-                ${[...meses].reverse().map(m => {
+                ${[...meses].reverse().map(m=>{
                   const d = mesesMap[m];
                   const lucro = d.receita - d.despesa;
                   const margem = d.receita ? Math.round(lucro/d.receita*100) : 0;
-                  const isMesAtual = m === mesAtual;
-                  return `<tr style="${isMesAtual?'background:var(--orange-light);font-weight:500':''}">
-                    <td><b>${nomeMes(m)}</b>${isMesAtual?' <span class="bdg bdg-orange" style="font-size:9px">atual</span>':''}</td>
+                  const atual = m===mesAtual;
+                  return `<tr style="${atual?'background:var(--orange-light)':''}">
+                    <td><b>${nomeMes(m)}</b>${atual?' <span class="bdg bdg-orange" style="font-size:9px">atual</span>':''}</td>
                     <td style="color:var(--green);font-weight:600">${fmtMoeda(d.receita)}</td>
                     <td style="color:var(--red)">${fmtMoeda(d.despesa)}</td>
                     <td style="color:var(--purple)">${fmtMoeda(d.repasses)}</td>
@@ -2061,69 +2045,68 @@ async function carregarRelatorios() {
                     <td style="color:var(--purple)">${fmtMoeda(d.reserva)}</td>
                   </tr>`;
                 }).join('')}
-                <tr style="background:#f7f3ee;font-weight:700;border-top:2px solid var(--border)">
+                <tr style="background:#f7f3ee;font-weight:700">
                   <td>TOTAL</td>
                   <td style="color:var(--green)">${fmtMoeda(receitaTotal)}</td>
                   <td style="color:var(--red)">${fmtMoeda(despesaTotal)}</td>
-                  <td style="color:var(--purple)">${fmtMoeda(movs.filter(m=>m.tipo==='saida'&&(m.categoria==='repasse_parceiro'||m.categoria==='repasse_banhista')).reduce((a,b)=>a+(Number(b.valor)||0),0))}</td>
-                  <td style="color:var(--blue)">${fmtMoeda(movs.filter(m=>m.tipo==='saida'&&m.categoria==='trafego_pago').reduce((a,b)=>a+(Number(b.valor)||0),0))}</td>
+                  <td style="color:var(--purple)">${fmtMoeda(meses.reduce((a,m)=>a+mesesMap[m].repasses,0))}</td>
+                  <td style="color:var(--blue)">${fmtMoeda(meses.reduce((a,m)=>a+mesesMap[m].trafego,0))}</td>
                   <td style="color:${lucroTotal>=0?'var(--green)':'var(--red)'}">${fmtMoeda(lucroTotal)}</td>
-                  <td><span class="bdg ${receitaTotal?Math.round(lucroTotal/receitaTotal*100):0 >= 30?'bdg-green':'bdg-gold'}">${receitaTotal?Math.round(lucroTotal/receitaTotal*100):0}%</span></td>
-                  <td style="color:var(--orange)">${fmtMoeda(movs.filter(m=>m.tipo==='saida'&&(m.categoria==='distribuicao_victor'||m.categoria==='distribuicao_alan')).reduce((a,b)=>a+(Number(b.valor)||0),0))}</td>
-                  <td style="color:var(--purple)">${fmtMoeda(movs.filter(m=>m.tipo==='saida'&&m.categoria==='reserva_societaria').reduce((a,b)=>a+(Number(b.valor)||0),0))}</td>
+                  <td><span class="bdg ${receitaTotal&&Math.round(lucroTotal/receitaTotal*100)>=30?'bdg-green':'bdg-gold'}">${receitaTotal?Math.round(lucroTotal/receitaTotal*100):0}%</span></td>
+                  <td style="color:var(--orange)">${fmtMoeda(meses.reduce((a,m)=>a+mesesMap[m].distribuicao,0))}</td>
+                  <td style="color:var(--purple)">${fmtMoeda(meses.reduce((a,m)=>a+mesesMap[m].reserva,0))}</td>
                 </tr>
               </tbody>
-            </table></div>`
-        }
+            </table></div>`}
       </div>
 
-      <!-- RECEITA POR SERVIÇO + ORIGEM -->
       <div class="g2">
         <div class="card">
-          <div class="card-title">🏆 Receita por serviço — acumulado</div>
-          ${Object.keys(porServico).length === 0
+          <div class="card-title">🏆 Receita por serviço</div>
+          ${Object.keys(porServico).length===0
             ? '<div style="text-align:center;padding:16px;color:var(--brown-mid);font-size:12px">Sem reservas registradas ainda</div>'
             : Object.entries(porServico).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`
                 <div class="bar-row">
                   <span class="bar-lbl">${labelServico(k)}</span>
                   <div class="bar-track"><div class="bar-fill" style="width:${Math.round(v/maxSvc*100)}%;background:var(--orange)"></div></div>
                   <span class="bar-val c-orange">${fmtMoeda(v)}</span>
-                </div>`).join('')
-          }
+                </div>`).join('')}
         </div>
         <div class="card">
           <div class="card-title">📣 Origem dos clientes</div>
-          ${Object.keys(origens).length === 0
+          ${Object.keys(origens).length===0
             ? '<div style="text-align:center;padding:16px;color:var(--brown-mid);font-size:12px">Sem clientes cadastrados ainda</div>'
             : Object.entries(origens).sort((a,b)=>b[1]-a[1]).map(([k,v])=>{
                 const pct = Math.round(v/totalTuts*100);
-                const cores = {organico:'var(--orange)',trafego_pago:'var(--blue)',blogueiro:'var(--purple)',adestrador:'var(--sage)',indicacao:'var(--gold)'};
-                const nomes = {organico:'Orgânico/Indicação',trafego_pago:'Tráfego Pago',blogueiro:'Blogueiro',adestrador:'Adestrador',indicacao:'Indicação'};
                 return `<div class="bar-row">
-                  <span class="bar-lbl">${nomes[k]||k}</span>
-                  <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${cores[k]||'var(--orange)'}"></div></div>
+                  <span class="bar-lbl">${nomeOrigens[k]||k}</span>
+                  <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${coresOrigens[k]||'var(--orange)'}"></div></div>
                   <span class="bar-val">${v} (${pct}%)</span>
                 </div>`;
-              }).join('')
-          }
+              }).join('')}
         </div>
       </div>
 
-      <!-- CRM RESUMO -->
       <div class="card">
-        <div class="card-title">👥 Resumo de Leads & CRM</div>
+        <div class="card-title">👥 Resumo CRM</div>
         <div class="metrics" style="margin-bottom:0">
           <div class="met"><div class="met-lbl">Total de leads</div><div class="met-val c-orange">${totalLeads}</div></div>
           <div class="met"><div class="met-lbl">Convertidos</div><div class="met-val c-green">${convertidos}</div></div>
           <div class="met"><div class="met-lbl">Não fecharam</div><div class="met-val c-red">${perdidos}</div></div>
           <div class="met"><div class="met-lbl">Em negociação</div><div class="met-val c-gold">${leads.filter(l=>!['convertido','perdido'].includes(l.etapa)).length}</div></div>
-          <div class="met"><div class="met-lbl">Taxa de conversão</div><div class="met-val c-purple">${taxaConv}%</div></div>
+          <div class="met"><div class="met-lbl">Taxa conversão</div><div class="met-val c-purple">${taxaConv}%</div></div>
         </div>
       </div>
     `;
   } catch(e) {
-    console.error(e);
-    el.innerHTML = '<div class="alert alert-red"><i class="ti ti-alert-circle"></i><span>Erro ao carregar relatórios. Tente novamente.</span></div>';
+    console.error('Erro relatórios:', e);
+    el.innerHTML = `
+      <div class="alert alert-red" style="margin-bottom:10px">
+        <i class="ti ti-alert-circle"></i>
+        <span><b>Erro ao carregar:</b> ${e.message}</span>
+      </div>
+      <button class="btn btn-primary" onclick="carregarRelatorios()"><i class="ti ti-refresh"></i>Tentar novamente</button>
+    `;
   }
 }
 
