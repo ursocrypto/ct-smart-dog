@@ -468,7 +468,7 @@ html,body{height:100%;font-family:'Bricolage Grotesque',system-ui;background:var
         <div class="card">
           <div class="tbl-wrap">
             <table class="tbl">
-              <thead><tr><th>Hora</th><th>Descrição</th><th>Categoria</th><th>Forma</th><th>Tipo</th><th>Valor</th></tr></thead>
+              <thead><tr><th>Hora</th><th>Descrição</th><th>Categoria</th><th>Forma</th><th>Conta</th><th>Tipo</th><th>Valor</th></tr></thead>
               <tbody id="tbl-caixa"><tr><td colspan="6" class="tbl-empty"><div class="loading"><div class="spinner"></div>Carregando...</div></td></tr></tbody>
             </table>
           </div>
@@ -578,6 +578,15 @@ html,body{height:100%;font-family:'Bricolage Grotesque',system-ui;background:var
           <option value="debito">Cartão de Débito</option>
         </select>
       </div>
+      <div class="field"><label>Conta destino 💳</label>
+        <select id="res-conta">
+          <option value="victor">Conta Victor</option>
+          <option value="alan">Conta Alan</option>
+          <option value="caixa">Caixa físico (dinheiro)</option>
+        </select>
+      </div>
+    </div>
+    <div class="row2">
       <div class="field"><label>Status pagamento</label>
         <select id="res-status-pgto">
           <option value="pendente">Pendente</option>
@@ -711,6 +720,13 @@ html,body{height:100%;font-family:'Bricolage Grotesque',system-ui;background:var
           <option value="ted">TED / Transferência</option>
         </select>
       </div>
+    </div>
+    <div class="field"><label>Conta 💳</label>
+      <select id="mov-conta">
+        <option value="victor">Conta Victor</option>
+        <option value="alan">Conta Alan</option>
+        <option value="caixa">Caixa físico (dinheiro)</option>
+      </select>
     </div>
     <div class="field"><label>Descrição</label><input id="mov-desc" placeholder="Ex: Rex — hospedagem (saldo)"/></div>
     <div class="modal-foot">
@@ -1184,6 +1200,7 @@ async function salvarReserva() {
     origem: document.getElementById('res-origem').value,
     numero_vaga: Number(document.getElementById('res-vaga').value)||null,
     profissional_banho_id: banhistaId||null,
+    conta_destino: document.getElementById('res-conta').value,
     observacoes: document.getElementById('res-obs').value||null
   }).select().single();
   if(error) { showToast('Erro ao salvar reserva','error'); return; }
@@ -1543,21 +1560,41 @@ async function carregarCaixa() {
   const { data } = await supa.from('movimentacoes').select('*').eq('data_movimentacao',hoje).order('criado_em',{ascending:false});
   const movs = data||[];
   const entradas = movs.filter(m=>m.tipo==='entrada').reduce((a,b)=>a+(Number(b.valor)||0),0);
-  const saidas = movs.filter(m=>m.tipo==='saida').reduce((a,b)=>a+(Number(b.valor)||0),0);
-  const pix = movs.filter(m=>m.tipo==='entrada'&&m.forma_pagamento==='pix').reduce((a,b)=>a+(Number(b.valor)||0),0);
+  const saidas   = movs.filter(m=>m.tipo==='saida').reduce((a,b)=>a+(Number(b.valor)||0),0);
+
+  // Saldo por conta — buscar TODOS os registros
+  const { data: todos } = await supa.from('movimentacoes').select('tipo,valor,conta_destino');
+  const allMovs = todos||[];
+  function saldoConta(conta) {
+    const ent = allMovs.filter(m=>m.tipo==='entrada'&&m.conta_destino===conta).reduce((a,b)=>a+(Number(b.valor)||0),0);
+    const sai = allMovs.filter(m=>m.tipo==='saida'&&m.conta_destino===conta).reduce((a,b)=>a+(Number(b.valor)||0),0);
+    return ent - sai;
+  }
+  const saldoVictor = saldoConta('victor');
+  const saldoAlan   = saldoConta('alan');
+  const saldoCaixa  = saldoConta('caixa');
+  const saldoTotal  = saldoVictor + saldoAlan + saldoCaixa;
+
   document.getElementById('caixa-metrics').innerHTML = `
     <div class="met"><div class="met-lbl">Entradas hoje</div><div class="met-val c-green">${fmtMoeda(entradas)}</div></div>
     <div class="met"><div class="met-lbl">Saídas hoje</div><div class="met-val c-red">${fmtMoeda(saidas)}</div></div>
     <div class="met"><div class="met-lbl">Saldo do dia</div><div class="met-val c-orange">${fmtMoeda(entradas-saidas)}</div></div>
-    <div class="met"><div class="met-lbl">Recebido via PIX</div><div class="met-val c-sage">${fmtMoeda(pix)}</div></div>
+    <div class="met" style="border-left:3px solid var(--orange)"><div class="met-lbl">💳 Conta Victor</div><div class="met-val c-orange">${fmtMoeda(saldoVictor)}</div><div class="met-sub">saldo acumulado</div></div>
+    <div class="met" style="border-left:3px solid var(--sage)"><div class="met-lbl">💳 Conta Alan</div><div class="met-val c-sage">${fmtMoeda(saldoAlan)}</div><div class="met-sub">saldo acumulado</div></div>
+    <div class="met" style="border-left:3px solid var(--brown-mid)"><div class="met-lbl">💵 Caixa físico</div><div class="met-val c-brown">${fmtMoeda(saldoCaixa)}</div><div class="met-sub">dinheiro em mãos</div></div>
+    <div class="met" style="border:2px solid var(--gold)"><div class="met-lbl">🏦 Saldo total</div><div class="met-val c-gold">${fmtMoeda(saldoTotal)}</div><div class="met-sub">todas as contas</div></div>
   `;
-  if(!movs.length) { document.getElementById('tbl-caixa').innerHTML='<tr><td colspan="6" class="tbl-empty">Nenhuma movimentação hoje</td></tr>'; return; }
+
+  const labelConta = {victor:'👤 Victor', alan:'👤 Alan', caixa:'💵 Caixa'};
+
+  if(!movs.length) { document.getElementById('tbl-caixa').innerHTML='<tr><td colspan="7" class="tbl-empty">Nenhuma movimentação hoje</td></tr>'; return; }
   document.getElementById('tbl-caixa').innerHTML = movs.map(m=>`
     <tr>
       <td style="color:var(--brown-mid);font-size:11px">${m.hora_movimentacao?.slice(0,5)||'--:--'}</td>
       <td>${m.descricao}</td>
       <td><span class="bdg bdg-gray" style="font-size:10px">${m.categoria?.replace(/_/g,' ')}</span></td>
       <td style="font-size:11px">${m.forma_pagamento?.toUpperCase()}</td>
+      <td><span class="bdg ${m.conta_destino==='victor'?'bdg-orange':m.conta_destino==='alan'?'bdg-sage':'bdg-brown'}" style="font-size:10px">${labelConta[m.conta_destino]||'—'}</span></td>
       <td><span class="bdg ${m.tipo==='entrada'?'bdg-green':'bdg-red'}">${m.tipo}</span></td>
       <td style="font-weight:700;color:${m.tipo==='entrada'?'var(--green)':'var(--red)'}">${m.tipo==='entrada'?'+':'-'}${fmtMoeda(m.valor)}</td>
     </tr>
@@ -1571,6 +1608,7 @@ async function salvarMovimentacao() {
     categoria: document.getElementById('mov-cat').value,
     descricao: document.getElementById('mov-desc').value||'Sem descrição',
     valor, forma_pagamento: document.getElementById('mov-pgto').value,
+    conta_destino: document.getElementById('mov-conta').value,
     data_movimentacao: new Date().toISOString().split('T')[0],
     hora_movimentacao: new Date().toTimeString().slice(0,5)
   });
@@ -1872,25 +1910,221 @@ async function confirmarDistribuicao() {
 
 // ====== RELATÓRIOS ======
 async function carregarRelatorios() {
-  const mesAtual = new Date().toISOString().slice(0,7);
-  const { data: movs } = await supa.from('movimentacoes').select('*').gte('data_movimentacao', mesAtual+'-01');
-  const movData = movs||[];
-  const receita = movData.filter(m=>m.tipo==='entrada').reduce((a,b)=>a+(Number(b.valor)||0),0);
-  const despesa = movData.filter(m=>m.tipo==='saida').reduce((a,b)=>a+(Number(b.valor)||0),0);
-  const { data: tuts } = await supa.from('tutores').select('id');
-  const { data: resv } = await supa.from('reservas').select('id').eq('status_reserva','concluida');
-  document.getElementById('relatorios-content').innerHTML = `
-    <div class="metrics">
-      <div class="met"><div class="met-lbl">Tutores cadastrados</div><div class="met-val c-orange">${tuts?.length||0}</div></div>
-      <div class="met"><div class="met-lbl">Reservas concluídas</div><div class="met-val c-sage">${resv?.length||0}</div></div>
-      <div class="met"><div class="met-lbl">Receita do mês</div><div class="met-val c-gold">${fmtMoeda(receita)}</div></div>
-      <div class="met"><div class="met-lbl">Lucro do mês</div><div class="met-val c-green">${fmtMoeda(receita-despesa)}</div></div>
-    </div>
-    <div class="card">
-      <div class="card-title">Relatórios disponíveis em breve</div>
-      <div class="alert alert-sage"><i class="ti ti-info-circle"></i><span>Conforme você for registrando reservas, movimentações e leads, os relatórios serão gerados automaticamente aqui com gráficos e exportação para PDF.</span></div>
-    </div>
-  `;
+  const el = document.getElementById('relatorios-content');
+  try {
+    // Buscar todos os dados necessários em paralelo
+    const [movsRes, tutsRes, resvRes, leadsRes] = await Promise.all([
+      supa.from('movimentacoes').select('*').order('data_movimentacao', {ascending:true}),
+      supa.from('tutores').select('id,criado_em,como_conheceu'),
+      supa.from('reservas').select('id,servico_tipo,valor_total,data_entrada,status_reserva,origem'),
+      supa.from('leads').select('id,etapa,criado_em')
+    ]);
+
+    const movs   = movsRes.data  || [];
+    const tuts   = tutsRes.data  || [];
+    const resvs  = resvRes.data  || [];
+    const leads  = leadsRes.data || [];
+
+    // Agrupar movimentações por mês
+    const mesesMap = {};
+    movs.forEach(m => {
+      const mes = (m.data_movimentacao||'').slice(0,7);
+      if(!mes) return;
+      if(!mesesMap[mes]) mesesMap[mes] = {receita:0, despesa:0, repasses:0, trafego:0, distribuicao:0, reserva:0};
+      const v = Number(m.valor)||0;
+      if(m.tipo==='entrada') mesesMap[mes].receita += v;
+      else {
+        mesesMap[mes].despesa += v;
+        if(m.categoria==='repasse_parceiro'||m.categoria==='repasse_banhista') mesesMap[mes].repasses += v;
+        if(m.categoria==='trafego_pago') mesesMap[mes].trafego += v;
+        if(m.categoria==='distribuicao_victor'||m.categoria==='distribuicao_alan') mesesMap[mes].distribuicao += v;
+        if(m.categoria==='reserva_societaria') mesesMap[mes].reserva += v;
+      }
+    });
+
+    const meses = Object.keys(mesesMap).sort();
+    const mesAtual = new Date().toISOString().slice(0,7);
+
+    // Métricas gerais
+    const receitaTotal = movs.filter(m=>m.tipo==='entrada').reduce((a,b)=>a+(Number(b.valor)||0),0);
+    const despesaTotal = movs.filter(m=>m.tipo==='saida').reduce((a,b)=>a+(Number(b.valor)||0),0);
+    const lucroTotal   = receitaTotal - despesaTotal;
+    const receitaMes   = mesesMap[mesAtual]?.receita || 0;
+    const despesaMes   = mesesMap[mesAtual]?.despesa || 0;
+
+    // Receita por serviço (geral)
+    const porServico = {};
+    resvs.forEach(r => {
+      const s = r.servico_tipo||'outros';
+      porServico[s] = (porServico[s]||0) + (Number(r.valor_total)||0);
+    });
+    const maxSvc = Math.max(...Object.values(porServico), 1);
+
+    // Origem dos clientes
+    const origens = {};
+    tuts.forEach(t => { const o=t.como_conheceu||'organico'; origens[o]=(origens[o]||0)+1; });
+    const totalTuts = tuts.length||1;
+
+    // Leads convertidos vs perdidos
+    const convertidos = leads.filter(l=>l.etapa==='convertido').length;
+    const perdidos    = leads.filter(l=>l.etapa==='perdido').length;
+    const totalLeads  = leads.length;
+    const taxaConv    = totalLeads ? Math.round(convertidos/totalLeads*100) : 0;
+
+    // Gráfico de barras SVG — receita mensal
+    const maxReceita = Math.max(...meses.map(m=>mesesMap[m].receita), 1);
+    const barW = meses.length ? Math.min(Math.floor(560/meses.length)-6, 60) : 40;
+    const svgBars = meses.map((m, i) => {
+      const rec = mesesMap[m].receita;
+      const luc = Math.max(mesesMap[m].receita - mesesMap[m].despesa, 0);
+      const hRec = Math.round((rec/maxReceita)*120);
+      const hLuc = Math.round((luc/maxReceita)*120);
+      const x = i*(barW+6)+10;
+      const label = m.slice(5)+'/'+m.slice(2,4);
+      return `
+        <rect x="${x}" y="${130-hRec}" width="${barW}" height="${hRec}" fill="#faf0d7" rx="3"/>
+        <rect x="${x}" y="${130-hLuc}" width="${barW}" height="${hLuc}" fill="#F08C4A" rx="3"/>
+        <text x="${x+barW/2}" y="146" text-anchor="middle" font-size="9" fill="#7a5c4a">${label}</text>
+        <text x="${x+barW/2}" y="${125-hRec}" text-anchor="middle" font-size="8" fill="#8a6018">${rec>=1000?(rec/1000).toFixed(1)+'k':rec}</text>
+      `;
+    }).join('');
+
+    const nomesMeses = {
+      '01':'Jan','02':'Fev','03':'Mar','04':'Abr','05':'Mai','06':'Jun',
+      '07':'Jul','08':'Ago','09':'Set','10':'Out','11':'Nov','12':'Dez'
+    };
+    function nomeMes(m) { return (nomesMeses[m.slice(5)]||m.slice(5))+'/'+m.slice(2,4); }
+
+    el.innerHTML = `
+      <!-- MÉTRICAS GERAIS -->
+      <div class="metrics">
+        <div class="met"><div class="met-lbl">Receita total acumulada</div><div class="met-val c-gold">${fmtMoeda(receitaTotal)}</div><div class="met-sub">desde o início</div></div>
+        <div class="met"><div class="met-lbl">Lucro total acumulado</div><div class="met-val c-green">${fmtMoeda(lucroTotal)}</div></div>
+        <div class="met"><div class="met-lbl">Receita mês atual</div><div class="met-val c-orange">${fmtMoeda(receitaMes)}</div></div>
+        <div class="met"><div class="met-lbl">Tutores cadastrados</div><div class="met-val c-sage">${tuts.length}</div></div>
+        <div class="met"><div class="met-lbl">Taxa de conversão</div><div class="met-val c-purple">${taxaConv}%</div><div class="met-sub">${convertidos} de ${totalLeads} leads</div></div>
+        <div class="met"><div class="met-lbl">Meses de operação</div><div class="met-val c-brown">${meses.length||1}</div></div>
+      </div>
+
+      <!-- GRÁFICO EVOLUÇÃO MENSAL -->
+      <div class="card">
+        <div class="card-title">📈 Evolução mensal — Receita vs Lucro</div>
+        ${meses.length === 0
+          ? '<div class="alert alert-sage"><i class="ti ti-info-circle"></i><span>Nenhuma movimentação registrada ainda. Comece registrando entradas no Caixa do Dia.</span></div>'
+          : `<div style="overflow-x:auto">
+              <svg width="${Math.max(meses.length*(barW+6)+20, 400)}" height="160" style="display:block">
+                <line x1="0" y1="130" x2="100%" y2="130" stroke="#ede5dc" stroke-width="1"/>
+                ${svgBars}
+              </svg>
+            </div>
+            <div style="display:flex;gap:16px;margin-top:8px;font-size:11px;color:var(--brown-mid)">
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#faf0d7;border:1px solid #f0c878;border-radius:2px;display:inline-block"></span>Receita</span>
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:var(--orange);border-radius:2px;display:inline-block"></span>Lucro</span>
+            </div>`
+        }
+      </div>
+
+      <!-- TABELA HISTÓRICA -->
+      <div class="card">
+        <div class="card-title">📅 Histórico mês a mês</div>
+        ${meses.length === 0
+          ? '<div style="text-align:center;padding:20px;color:var(--brown-mid);font-size:12px">Sem dados históricos ainda</div>'
+          : `<div class="tbl-wrap"><table class="tbl">
+              <thead>
+                <tr>
+                  <th>Mês</th>
+                  <th>Receita</th>
+                  <th>Despesas</th>
+                  <th>Repasses</th>
+                  <th>Tráfego pago</th>
+                  <th>Lucro líquido</th>
+                  <th>Margem</th>
+                  <th>Distribuído</th>
+                  <th>Reserva</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${[...meses].reverse().map(m => {
+                  const d = mesesMap[m];
+                  const lucro = d.receita - d.despesa;
+                  const margem = d.receita ? Math.round(lucro/d.receita*100) : 0;
+                  const isMesAtual = m === mesAtual;
+                  return `<tr style="${isMesAtual?'background:var(--orange-light);font-weight:500':''}">
+                    <td><b>${nomeMes(m)}</b>${isMesAtual?' <span class="bdg bdg-orange" style="font-size:9px">atual</span>':''}</td>
+                    <td style="color:var(--green);font-weight:600">${fmtMoeda(d.receita)}</td>
+                    <td style="color:var(--red)">${fmtMoeda(d.despesa)}</td>
+                    <td style="color:var(--purple)">${fmtMoeda(d.repasses)}</td>
+                    <td style="color:var(--blue)">${fmtMoeda(d.trafego)}</td>
+                    <td style="color:${lucro>=0?'var(--green)':'var(--red)'};font-weight:700">${fmtMoeda(lucro)}</td>
+                    <td><span class="bdg ${margem>=30?'bdg-green':margem>=10?'bdg-gold':'bdg-red'}">${margem}%</span></td>
+                    <td style="color:var(--orange)">${fmtMoeda(d.distribuicao)}</td>
+                    <td style="color:var(--purple)">${fmtMoeda(d.reserva)}</td>
+                  </tr>`;
+                }).join('')}
+                <tr style="background:#f7f3ee;font-weight:700;border-top:2px solid var(--border)">
+                  <td>TOTAL</td>
+                  <td style="color:var(--green)">${fmtMoeda(receitaTotal)}</td>
+                  <td style="color:var(--red)">${fmtMoeda(despesaTotal)}</td>
+                  <td style="color:var(--purple)">${fmtMoeda(movs.filter(m=>m.tipo==='saida'&&(m.categoria==='repasse_parceiro'||m.categoria==='repasse_banhista')).reduce((a,b)=>a+(Number(b.valor)||0),0))}</td>
+                  <td style="color:var(--blue)">${fmtMoeda(movs.filter(m=>m.tipo==='saida'&&m.categoria==='trafego_pago').reduce((a,b)=>a+(Number(b.valor)||0),0))}</td>
+                  <td style="color:${lucroTotal>=0?'var(--green)':'var(--red)'}">${fmtMoeda(lucroTotal)}</td>
+                  <td><span class="bdg ${receitaTotal?Math.round(lucroTotal/receitaTotal*100):0 >= 30?'bdg-green':'bdg-gold'}">${receitaTotal?Math.round(lucroTotal/receitaTotal*100):0}%</span></td>
+                  <td style="color:var(--orange)">${fmtMoeda(movs.filter(m=>m.tipo==='saida'&&(m.categoria==='distribuicao_victor'||m.categoria==='distribuicao_alan')).reduce((a,b)=>a+(Number(b.valor)||0),0))}</td>
+                  <td style="color:var(--purple)">${fmtMoeda(movs.filter(m=>m.tipo==='saida'&&m.categoria==='reserva_societaria').reduce((a,b)=>a+(Number(b.valor)||0),0))}</td>
+                </tr>
+              </tbody>
+            </table></div>`
+        }
+      </div>
+
+      <!-- RECEITA POR SERVIÇO + ORIGEM -->
+      <div class="g2">
+        <div class="card">
+          <div class="card-title">🏆 Receita por serviço — acumulado</div>
+          ${Object.keys(porServico).length === 0
+            ? '<div style="text-align:center;padding:16px;color:var(--brown-mid);font-size:12px">Sem reservas registradas ainda</div>'
+            : Object.entries(porServico).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`
+                <div class="bar-row">
+                  <span class="bar-lbl">${labelServico(k)}</span>
+                  <div class="bar-track"><div class="bar-fill" style="width:${Math.round(v/maxSvc*100)}%;background:var(--orange)"></div></div>
+                  <span class="bar-val c-orange">${fmtMoeda(v)}</span>
+                </div>`).join('')
+          }
+        </div>
+        <div class="card">
+          <div class="card-title">📣 Origem dos clientes</div>
+          ${Object.keys(origens).length === 0
+            ? '<div style="text-align:center;padding:16px;color:var(--brown-mid);font-size:12px">Sem clientes cadastrados ainda</div>'
+            : Object.entries(origens).sort((a,b)=>b[1]-a[1]).map(([k,v])=>{
+                const pct = Math.round(v/totalTuts*100);
+                const cores = {organico:'var(--orange)',trafego_pago:'var(--blue)',blogueiro:'var(--purple)',adestrador:'var(--sage)',indicacao:'var(--gold)'};
+                const nomes = {organico:'Orgânico/Indicação',trafego_pago:'Tráfego Pago',blogueiro:'Blogueiro',adestrador:'Adestrador',indicacao:'Indicação'};
+                return `<div class="bar-row">
+                  <span class="bar-lbl">${nomes[k]||k}</span>
+                  <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${cores[k]||'var(--orange)'}"></div></div>
+                  <span class="bar-val">${v} (${pct}%)</span>
+                </div>`;
+              }).join('')
+          }
+        </div>
+      </div>
+
+      <!-- CRM RESUMO -->
+      <div class="card">
+        <div class="card-title">👥 Resumo de Leads & CRM</div>
+        <div class="metrics" style="margin-bottom:0">
+          <div class="met"><div class="met-lbl">Total de leads</div><div class="met-val c-orange">${totalLeads}</div></div>
+          <div class="met"><div class="met-lbl">Convertidos</div><div class="met-val c-green">${convertidos}</div></div>
+          <div class="met"><div class="met-lbl">Não fecharam</div><div class="met-val c-red">${perdidos}</div></div>
+          <div class="met"><div class="met-lbl">Em negociação</div><div class="met-val c-gold">${leads.filter(l=>!['convertido','perdido'].includes(l.etapa)).length}</div></div>
+          <div class="met"><div class="met-lbl">Taxa de conversão</div><div class="met-val c-purple">${taxaConv}%</div></div>
+        </div>
+      </div>
+    `;
+  } catch(e) {
+    console.error(e);
+    el.innerHTML = '<div class="alert alert-red"><i class="ti ti-alert-circle"></i><span>Erro ao carregar relatórios. Tente novamente.</span></div>';
+  }
 }
 
 // ====== PROFISSIONAL BANHO ======
