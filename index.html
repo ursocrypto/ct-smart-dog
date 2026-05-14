@@ -1054,6 +1054,7 @@ function nav(pg, el) {
   if(pg==='financeiro') carregarFinanceiro();
   if(pg==='caixa') carregarCaixa();
   if(pg==='socios') carregarSocios();
+  if(pg==='relatorios') setTimeout(carregarRelatorios, 150);
   if(window.innerWidth<=768) document.getElementById('sidebar').classList.remove('mobile-open');
 }
 
